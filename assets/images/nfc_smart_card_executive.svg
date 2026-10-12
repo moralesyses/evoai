@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <!-- Placeholder product render of the 1EVOAI executive NFC card. -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="70%">
+      <stop offset="0%" stop-color="#2b2413"/>
+      <stop offset="55%" stop-color="#110f0a"/>
+      <stop offset="100%" stop-color="#050504"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1c1a15"/>
+      <stop offset="50%" stop-color="#0d0c0a"/>
+      <stop offset="100%" stop-color="#1a1710"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffda72"/>
+      <stop offset="50%" stop-color="#f3bd35"/>
+      <stop offset="100%" stop-color="#8f6510"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="30" stdDeviation="30" flood-color="#000" flood-opacity="0.8"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <ellipse cx="640" cy="610" rx="420" ry="40" fill="#f3bd35" opacity="0.08"/>
+  <g transform="translate(640 350) rotate(-8)" filter="url(#shadow)">
+    <rect x="-330" y="-205" width="660" height="410" rx="34" fill="url(#card)" stroke="url(#gold)" stroke-width="4"/>
+    <rect x="-330" y="-205" width="660" height="410" rx="34" fill="url(#sheen)"/>
+    <!-- chip -->
+    <rect x="-270" y="-95" width="92" height="70" rx="12" fill="url(#gold)"/>
+    <path d="M-270 -60 H-178 M-224 -95 V-25 M-250 -95 V-25 M-198 -95 V-25" stroke="#6b4b0b" stroke-width="3" fill="none"/>
+    <!-- contactless waves -->
+    <g fill="none" stroke="url(#gold)" stroke-width="7" stroke-linecap="round">
+      <path d="M215 -120 a40 40 0 0 1 0 56"/>
+      <path d="M240 -140 a68 68 0 0 1 0 96"/>
+      <path d="M265 -160 a96 96 0 0 1 0 136"/>
+    </g>
+    <!-- monogram -->
+    <circle cx="0" cy="-10" r="62" fill="#090909" stroke="url(#gold)" stroke-width="5"/>
+    <text x="0" y="12" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-weight="900" font-size="60" fill="url(#gold)">88</text>
+    <text x="-270" y="120" font-family="Segoe UI, Arial, sans-serif" font-weight="800" font-size="34" letter-spacing="6" fill="url(#gold)">88MMM CIRCLE</text>
+    <text x="-270" y="160" font-family="Consolas, monospace" font-size="22" letter-spacing="4" fill="#bfa76a">1EVOAI · EXECUTIVE NFC</text>
+    <text x="270" y="160" text-anchor="end" font-family="Consolas, monospace" font-size="22" fill="#8a7a50">MMC-VIP</text>
+  </g>
+</svg>

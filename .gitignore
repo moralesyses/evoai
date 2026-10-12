@@ -1,0 +1,5 @@
+# Local settings and data that must not be committed or published
+config/config.php
+database/weserve_members.sql
+.env
+uploads/sites/

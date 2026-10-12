@@ -1,0 +1,21 @@
+# Members' website images (includes/website.php). Only image files are
+# served; nothing here ever runs as a script.
+Options -Indexes -ExecCGI
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .php8 .phar .pl .py .cgi .sh
+RemoveType .php .phtml .phar
+<FilesMatch "\.(?i:php\d*|phtml|phar|pl|py|cgi|sh|htaccess|html?|svg|js)$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "^(?!.*\.(?i:jpe?g|png|webp|gif)$).+$">
+    Require all denied
+</FilesMatch>
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"
+</IfModule>

@@ -1,0 +1,23 @@
+# 1EVOAI Executive Portal — Apache settings
+Options -Indexes
+DirectoryIndex index.php
+AddDefaultCharset UTF-8
+AddType application/manifest+json .webmanifest
+AddType image/svg+xml .svg
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    <FilesMatch "sw\.js$">
+        Header set Service-Worker-Allowed "/"
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+</IfModule>
+
+# Never serve SQL dumps, logs or dotfiles directly.
+<FilesMatch "\.(sql|log|md|ini|bak)$|^\.">
+    Require all denied
+</FilesMatch>
+# Nor Composer's package lists (the libraries in vendor/ have their own deny rule).
+<FilesMatch "^composer\.(json|lock)$">
+    Require all denied
+</FilesMatch>

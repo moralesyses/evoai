@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <!-- Placeholder executive portrait (replace with a real photo via Admin > Portal CMS). -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#2a2414"/>
+      <stop offset="60%" stop-color="#14110a"/>
+      <stop offset="100%" stop-color="#070706"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffda72"/>
+      <stop offset="55%" stop-color="#f3bd35"/>
+      <stop offset="100%" stop-color="#8f6510"/>
+    </linearGradient>
+    <linearGradient id="suit" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1d1a12"/>
+      <stop offset="100%" stop-color="#0b0a07"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="600" fill="url(#bg)"/>
+  <circle cx="300" cy="300" r="250" fill="none" stroke="url(#gold)" stroke-opacity="0.18" stroke-width="2" stroke-dasharray="10 8"/>
+  <!-- shoulders / suit -->
+  <path d="M90 600 C110 470 190 410 300 405 C410 410 490 470 510 600 Z" fill="url(#suit)" stroke="url(#gold)" stroke-opacity="0.55" stroke-width="3"/>
+  <path d="M255 410 L300 500 L345 410" fill="none" stroke="url(#gold)" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M300 430 L285 470 L300 560 L315 470 Z" fill="url(#gold)" opacity="0.85"/>
+  <!-- head -->
+  <ellipse cx="300" cy="265" rx="92" ry="110" fill="#1a170f" stroke="url(#gold)" stroke-width="4"/>
+  <path d="M212 236 C218 162 268 140 304 142 C352 144 392 174 390 238 C372 206 336 196 300 198 C262 200 232 212 212 236 Z" fill="url(#gold)" opacity="0.9"/>
+  <!-- monogram -->
+  <g transform="translate(470 470)">
+    <circle r="54" fill="#090909" stroke="url(#gold)" stroke-width="4"/>
+    <text y="13" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-weight="900" font-size="38" fill="url(#gold)">88</text>
+  </g>
+</svg>

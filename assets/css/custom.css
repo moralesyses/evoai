@@ -1,0 +1,168 @@
+/*
+ * Small additions on top of the compiled Tailwind stylesheet (app.css).
+ * app.css is the reference portal's stylesheet and is used unchanged.
+ */
+
+/* Elements toggled with the `hidden` attribute must stay hidden even when
+   they carry Tailwind display utilities such as `flex`. */
+[hidden] {
+  display: none !important;
+}
+
+/* Toast stack (used for flash messages after page reloads). */
+#evo-toasts {
+  position: fixed;
+  top: 64px;
+  right: 16px;
+  z-index: 60;
+  max-width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+/* Toasts hold no controls: clicks go through them, so they never cover a
+   window's close button or the buttons beneath them while they fade. */
+.evo-toast {
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+}
+.evo-toast-ok {
+  background: rgba(2, 44, 34, 0.92);
+}
+.evo-toast-err {
+  background: rgba(76, 5, 25, 0.92);
+}
+
+/* Print only the receipt when a receipt modal is open. */
+@media print {
+  body.evo-printing * {
+    visibility: hidden !important;
+  }
+  body.evo-printing [data-print-area],
+  body.evo-printing [data-print-area] * {
+    visibility: visible !important;
+  }
+  body.evo-printing [data-print-area] {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* 88MMM Assistant (views/partials/assistant.php): the chat button and window,
+   kept above the mobile bottom navigation, under modals and toasts. */
+.evo-assistant-btn {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 45;
+}
+.evo-assistant-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 80px;
+  z-index: 46;
+  width: min(400px, calc(100vw - 24px));
+  height: min(600px, calc(100vh - 110px));
+  display: flex;
+  flex-direction: column;
+}
+.evo-assistant-panel[hidden] {
+  display: none;
+}
+.evo-assistant-log {
+  flex: 1;
+  overflow-y: auto;
+}
+.evo-assistant-log ul {
+  list-style: disc;
+  padding-left: 1.1rem;
+  margin: 0.25rem 0;
+}
+.evo-assistant-log p + p,
+.evo-assistant-log p + ul,
+.evo-assistant-log ul + p {
+  margin-top: 0.4rem;
+}
+.evo-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (max-width: 767px) {
+  .evo-assistant-btn {
+    right: 12px;
+    bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+  .evo-assistant-panel {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    bottom: calc(70px + env(safe-area-inset-bottom));
+    height: calc(100vh - 150px);
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * Backoffice > My Website: the builder (views/backoffice/website.php,
+ * assets/js/views/bo-website.js)
+ * ------------------------------------------------------------------- */
+.evo-wb-editor { min-width: 0; }
+.evo-wb { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+.evo-wb-panel { background: #111111; border: 1px solid rgba(243, 189, 53, .2); border-radius: 22px; overflow: hidden; }
+.evo-wb-panel > summary, .evo-wb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #f3bd35; cursor: pointer; list-style: none; }
+.evo-wb-panel > summary::-webkit-details-marker { display: none; }
+.evo-wb-body { padding: 0 16px 16px; display: grid; gap: 12px; }
+.evo-wb-field { display: grid; gap: 4px; font-size: 11px; color: #d4d4d8; font-weight: 600; }
+.evo-wb-field small { font-weight: 400; color: #71717a; }
+.evo-wb-field input[type=text], .evo-wb-field textarea, .evo-wb-field select, .evo-wb-add select { width: 100%; padding: 8px 10px; border-radius: 12px; background: #18181b; border: 1px solid #3f3f46; color: #fff; font-size: 12px; font-family: inherit; }
+.evo-wb-field textarea { resize: vertical; min-height: 64px; }
+.evo-wb-field input:focus, .evo-wb-field textarea:focus, .evo-wb-field select:focus { outline: none; border-color: #f3bd35; }
+.evo-wb-field.is-invalid input, .evo-wb-field.is-invalid textarea { border-color: #f43f5e; }
+.evo-wb-field .evo-wb-error { color: #fda4af; font-weight: 500; }
+.evo-wb-check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #d4d4d8; cursor: pointer; }
+.evo-wb-check input { accent-color: #f3bd35; width: 15px; height: 15px; }
+.evo-wb-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.evo-wb-theme { display: grid; gap: 6px; padding: 8px; border-radius: 12px; border: 1px solid #3f3f46; background: #18181b; color: #d4d4d8; font-size: 11px; cursor: pointer; text-align: left; }
+.evo-wb-theme.is-on { border-color: #f3bd35; box-shadow: 0 0 0 1px #f3bd35 inset; color: #fff; }
+.evo-wb-swatch { display: flex; height: 18px; border-radius: 6px; overflow: hidden; }
+.evo-wb-swatch i { flex: 1; }
+.evo-wb-color { display: flex; align-items: center; gap: 10px; }
+.evo-wb-color input[type=color] { width: 42px; height: 30px; padding: 0; border: 1px solid #3f3f46; border-radius: 8px; background: none; cursor: pointer; }
+.evo-wb-section { border-top: 1px solid #27272a; }
+.evo-wb-section-row { display: flex; align-items: center; gap: 6px; padding: 10px 12px 10px 16px; }
+.evo-wb-section-row.is-hidden .evo-wb-section-title { opacity: .45; text-decoration: line-through; }
+.evo-wb-section-title { flex: 1; min-width: 0; text-align: left; background: none; border: 0; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; padding: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evo-wb-section-title span { color: #71717a; font-weight: 500; margin-left: 6px; }
+.evo-wb-section.is-open { background: #0c0c0c; }
+.evo-wb-section.is-open .evo-wb-section-title { color: #ffda72; }
+.evo-wb-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: #18181b; border: 1px solid #27272a; color: #a1a1aa; cursor: pointer; font-size: 13px; line-height: 1; }
+.evo-wb-icon:hover:not(:disabled) { color: #fff; border-color: #52525b; }
+.evo-wb-icon:disabled { opacity: .3; cursor: default; }
+.evo-wb-icon.is-danger:hover { color: #fda4af; border-color: rgba(244, 63, 94, .5); }
+.evo-wb-icon svg { width: 14px; height: 14px; }
+.evo-wb-list { display: grid; gap: 10px; }
+.evo-wb-item { border: 1px solid #27272a; border-radius: 14px; padding: 10px; display: grid; gap: 8px; background: #111111; }
+.evo-wb-item-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; color: #a1a1aa; font-weight: 700; }
+.evo-wb-small { justify-self: start; padding: 6px 12px; border-radius: 10px; background: #18181b; border: 1px solid #3f3f46; color: #e4e4e7; font-size: 11px; font-weight: 600; cursor: pointer; }
+.evo-wb-small:hover:not(:disabled) { border-color: #f3bd35; color: #fff; }
+.evo-wb-small:disabled { opacity: .4; cursor: default; }
+.evo-wb-image { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; align-items: center; }
+.evo-wb-thumb { width: 64px; height: 48px; border-radius: 8px; background: #18181b center / cover no-repeat; border: 1px solid #3f3f46; }
+.evo-wb-image-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.evo-wb-add { display: flex; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid #27272a; }
+.evo-wb-add select { flex: 1; }
+.evo-wb-preview { position: sticky; top: 84px; background: #111111; border: 1px solid rgba(243, 189, 53, .2); border-radius: 22px; overflow: hidden; }
+.evo-wb-preview-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; font-size: 11px; font-weight: 700; color: #a1a1aa; border-bottom: 1px solid #27272a; text-transform: uppercase; letter-spacing: .06em; }
+.evo-wb-device { display: inline-flex; padding: 6px; border-radius: 8px; color: #71717a; background: none; border: 1px solid transparent; cursor: pointer; }
+.evo-wb-device.is-on { color: #f3bd35; border-color: rgba(243, 189, 53, .4); }
+.evo-wb-frame-wrap { height: 72vh; display: flex; justify-content: center; background: #0a0a0a; }
+.evo-wb-frame-wrap iframe { width: 100%; height: 100%; border: 0; background: #fff; transition: width .2s; }
+.evo-wb-frame-wrap.is-phone iframe { width: 390px; max-width: 100%; border-left: 1px solid #27272a; border-right: 1px solid #27272a; }
+.sr-only-wb { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 1023px) {
+    .evo-wb { grid-template-columns: minmax(0, 1fr); }
+    .evo-wb-preview { position: static; }
+    .evo-wb-frame-wrap { height: 60vh; }
+}
