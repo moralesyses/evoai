@@ -112,7 +112,7 @@ try {
 
         'auth.switch' => (function () use ($in) {
             $me = api_user();
-            if (!demo_mode() && !is_admin($me)) {
+            if (!demo_mode()) { // demo mode only, like the switcher in the header
                 api_fail('Account switching is disabled.', 403);
             }
             $target = db_one('SELECT * FROM users WHERE id = ?', [str_in($in, 'userId', 40)]);
@@ -167,14 +167,6 @@ try {
         'mlm.encash' => (function () use ($in) {
             $u = api_user();
             return mlm_submit_encashment(api_account($u), $in);
-        })(),
-
-        'mlm.simulatePair' => (function () {
-            $u = api_user();
-            if (!demo_mode() && !is_admin($u)) {
-                api_fail('Pairing simulation is only available in demo mode.', 403);
-            }
-            return mlm_simulate_pairing(api_account($u));
         })(),
 
         'mlm.buyCodes' => (function () use ($in) {

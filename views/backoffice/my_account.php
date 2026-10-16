@@ -55,7 +55,7 @@ $maCardThemes = [
 ];
 $maCardClass = $maCardThemes[$maTheme] ?? $maCardThemes['rosegold'];
 $maMetrics = $profile['metrics'] ?? [];
-$maSlug = domain_card_domain($user['id']) ?? ($profile['customSlug'] ?: ('1evoai.com/' . str_replace('usr_', '', $user['id']))); // their own .com domain when the card uses one
+$maSlug = domain_card_domain($user['id']) ?? preg_replace('#^https?://#', '', card_share_url($profile, false)); // their own .com domain when the card uses one
 $maActions = [
     ['id' => 'card', 'title' => 'Open Executive Digital Card Portal', 'desc' => 'Opens your full responsive interactive portal (' . $maSlug . ') featuring credentials, video, and syndicate links.', 'badge' => 'Recommended', 'icon' => 'smartphone'],
     ['id' => 'vcard', 'title' => 'Direct vCard Address Book Download (.vcf)', 'desc' => 'Instantly downloads your contact card directly into their iPhone / Android contacts with zero friction.', 'badge' => 'High Conversion', 'icon' => 'user'],
@@ -86,7 +86,7 @@ $maQtyOff = 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800';
     <div data-modal="ma-transfer-code" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" role="dialog" aria-modal="true" aria-labelledby="ma-transfer-title">
         <div class="w-full max-w-md rounded-3xl bg-[#141414] border border-[#f3bd35]/40 p-6 shadow-2xl relative text-left">
             <h3 id="ma-transfer-title" class="text-lg font-bold text-white mb-1">Transfer Activation Code</h3>
-            <p class="text-xs text-zinc-400 mb-4">Transfer code <strong class="text-[#ffda72] font-mono" data-ma-transfer-code></strong> to a downline or prospect username.</p>
+            <p class="text-xs text-zinc-400 mb-4">Transfer code <strong class="text-[#ffda72] font-mono" data-ma-transfer-code></strong> to a team member or prospect username.</p>
             <div data-ma-transfer-success hidden role="status" class="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs text-center font-bold"></div>
             <form id="ma-transfer-form" class="space-y-4">
                 <input type="hidden" name="code" value="">
@@ -128,7 +128,7 @@ $maQtyOff = 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800';
     <div class="flex items-center gap-1.5 p-1.5 bg-[#121212] rounded-2xl border border-zinc-800 overflow-x-auto text-xs" data-tab-group="acct" data-param="acct" role="tablist">
         <button type="button" role="tab" aria-selected="<?= $maTab === 'accounts' ? 'true' : 'false' ?>" data-tab="accounts" data-group="acct" data-on="<?= $maOn ?>" data-off="<?= $maOff ?>" class="<?= $maBtn ?> <?= $maTab === 'accounts' ? $maOn : $maOff ?>">
             <?= icon('users', 'w-4 h-4') ?>
-            <span>Account List (<?= count($accounts) ?> Heads)</span>
+            <span>Account List (<?= count($accounts) ?> Accounts)</span>
         </button>
         <button type="button" role="tab" aria-selected="<?= $maTab === 'profile' ? 'true' : 'false' ?>" data-tab="profile" data-group="acct" data-on="<?= $maOn ?>" data-off="<?= $maOff ?>" class="<?= $maBtn ?> <?= $maTab === 'profile' ? $maOn : $maOff ?>">
             <?= icon('user', 'w-4 h-4') ?>
@@ -165,9 +165,9 @@ $maQtyOff = 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800';
             <div>
                 <h3 class="text-lg font-bold text-white flex items-center gap-2">
                     <?= icon('users', 'w-5 h-5 text-[#f3bd35]') ?>
-                    Registered Multiple Accounts / Heads
+                    Registered Multiple Accounts
                 </h3>
-                <p class="text-xs text-zinc-400 mt-0.5">Switch active account to manage genealogy, view independent earnings, and place downlines.</p>
+                <p class="text-xs text-zinc-400 mt-0.5">Switch active account to manage your team tree, view independent earnings, and place team members.</p>
             </div>
             <span class="text-xs font-mono text-[#ffda72] bg-[#f3bd35]/15 border border-[#f3bd35]/30 px-3 py-1 rounded-full font-bold">Current Active: <?= e($account['id']) ?></span>
         </div>
@@ -175,7 +175,7 @@ $maQtyOff = 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800';
             <?php foreach ($accounts as $maA): $maCur = $maA['id'] === $account['id']; ?>
                 <div class="p-5 rounded-3xl border transition-all relative <?= $maCur ? 'bg-gradient-to-b from-[#18140c] to-[#0f0e0b] border-[#f3bd35] shadow-xl ring-1 ring-[#f3bd35]' : 'bg-[#121212] border-zinc-800 hover:border-zinc-700' ?>">
                     <div class="flex items-center justify-between mb-3">
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-[#f3bd35]/20 text-[#ffda72]">Head #<?= e($maA['headNumber']) ?> <?= $maA['headNumber'] === 1 ? '(Main)' : '' ?></span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-[#f3bd35]/20 text-[#ffda72]">Account #<?= e($maA['headNumber']) ?> <?= $maA['headNumber'] === 1 ? '(Main)' : '' ?></span>
                         <span class="text-xs font-mono text-zinc-400 font-bold"><?= e($maA['id']) ?></span>
                     </div>
                     <h4 class="text-base font-bold text-white"><?= e($maA['accountName']) ?></h4>
@@ -191,14 +191,14 @@ $maQtyOff = 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800';
                         </div>
                         <div class="flex justify-between">
                             <span class="text-zinc-400">Left / Right Volume:</span>
-                            <span class="font-mono text-[#f3bd35]"><?= e($maA['leftPoints']) ?> PV / <?= e($maA['rightPoints']) ?> PV</span>
+                            <span class="font-mono text-[#f3bd35]"><?= e($maA['leftPoints']) ?> pts / <?= e($maA['rightPoints']) ?> pts</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-zinc-400">Team Size:</span>
-                            <span class="text-zinc-300"><?= $maA['leftCount'] + $maA['rightCount'] ?> downlines</span>
+                            <span class="text-zinc-300"><?= $maA['leftCount'] + $maA['rightCount'] ?> members</span>
                         </div>
                     </div>
-                    <button type="button" <?= $maCur ? 'disabled' : 'data-ma-switch="' . e($maA['id']) . '"' ?> class="w-full py-2.5 rounded-xl text-xs font-bold transition-all <?= $maCur ? 'bg-[#f3bd35] text-black shadow cursor-default' : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700' ?>"><?= $maCur ? '✓ Currently Selected Head' : 'Switch to This Head' ?></button>
+                    <button type="button" <?= $maCur ? 'disabled' : 'data-ma-switch="' . e($maA['id']) . '"' ?> class="w-full py-2.5 rounded-xl text-xs font-bold transition-all <?= $maCur ? 'bg-[#f3bd35] text-black shadow cursor-default' : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700' ?>"><?= $maCur ? '✓ Currently Selected Account' : 'Switch to This Account' ?></button>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -313,9 +313,9 @@ $maQtyOff = 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800';
                 <h4 class="text-xs font-bold text-[#f3bd35] uppercase tracking-wider flex items-center gap-2"><?= icon('key', 'w-4 h-4') ?> B. Transaction PIN &amp; 2-Factor Auth</h4>
                 <div class="space-y-4 text-xs">
                     <div>
-                        <label for="ma-pin" class="block text-zinc-400 mb-1 font-semibold">4-Digit Transaction Security PIN (Required for Encashments)</label>
+                        <label for="ma-pin" class="block text-zinc-400 mb-1 font-semibold">4-Digit Transaction Security PIN (Required for Withdrawals)</label>
                         <input id="ma-pin" name="pin" type="password" maxlength="6" inputmode="numeric" pattern="\d{4,6}" autocomplete="off" value="<?= $maHasPin ? '' : '8888' ?>"<?= $maHasPin ? ' placeholder="••••"' : '' ?> class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white font-mono tracking-widest text-center text-base focus:outline-none focus:border-[#f3bd35]">
-                        <span class="text-[10px] text-zinc-500 mt-1 block">Protects against unauthorized fund encashments or code transfers.</span>
+                        <span class="text-[10px] text-zinc-500 mt-1 block">Protects against unauthorized fund withdrawals or code transfers.</span>
                     </div>
                     <div class="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800 flex items-center justify-between">
                         <div>
@@ -341,7 +341,7 @@ $maQtyOff = 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800';
                     <?= icon('credit-card', 'w-5 h-5 text-[#f3bd35]') ?>
                     Activation Codes &amp; Product PIN Vault
                 </h3>
-                <p class="text-xs text-zinc-400 mt-0.5">Each code activates 1x Executive Membership (₱2,000 PHP) with 100 PV points.</p>
+                <p class="text-xs text-zinc-400 mt-0.5">Each code activates 1x Executive Membership (₱2,000 PHP) with 100 points.</p>
             </div>
             <button type="button" data-open-modal="ma-buy-codes" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-extrabold text-xs shadow-md hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 self-start sm:self-auto">
                 <?= icon('plus', 'w-4 h-4') ?>
@@ -443,7 +443,7 @@ $maQtyOff = 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800';
                         <?= icon('shield-check', 'w-3.5 h-3.5') ?>
                         E2EE Hardware Verified
                     </span>
-                    <span class="text-[10px] px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-300 font-mono">Linked to Head: <?= e($account['id']) ?> (<?= e($account['accountName']) ?>)</span>
+                    <span class="text-[10px] px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-300 font-mono">Linked to Account: <?= e($account['id']) ?> (<?= e($account['accountName']) ?>)</span>
                 </div>
                 <h3 class="text-xl font-black text-white flex items-center gap-2">
                     Executive Smart NFC Card Management
@@ -592,7 +592,7 @@ $maQtyOff = 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800';
                             <?= icon('credit-card', 'w-3.5 h-3.5 text-[#f3bd35]') ?>
                             Need an Additional or Replacement Smart Card?
                         </h5>
-                        <p class="text-[11px] text-zinc-400 mt-0.5">Order laser-etched spare cards for your team or replacement hardware for only <strong class="text-[#ffda72]">₱1,000 PHP</strong> (Member discounted rate · 25 PV).</p>
+                        <p class="text-[11px] text-zinc-400 mt-0.5">Order laser-etched spare cards for your team or replacement hardware for only <strong class="text-[#ffda72]">₱1,000 PHP</strong> (Member discounted rate · 25 points).</p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <button type="button" data-ma-goto="shop" class="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-xs text-white font-bold transition-all">Order in Shop →</button>

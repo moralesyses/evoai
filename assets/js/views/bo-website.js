@@ -3,7 +3,9 @@
  * builder. The forms are drawn from the schema the server sends
  * (site_schema() in includes/website.php). Every change saves the draft a
  * moment later (site.save) and reloads the preview at the section being
- * edited; Publish puts the draft live on the member's domain.
+ * edited. "Start from a design" replaces the draft with one of the starting
+ * designs (site.design). Publish puts the draft live: at the member's portal address, and
+ * on their .com domain when they own one (data.domain).
  */
 (function () {
   'use strict';
@@ -13,10 +15,11 @@
   var saveTimer = null;
 
   // Delete for good (also offered while the tab is locked, for a site saved earlier).
+  var hasDomain = !!(data && data.domain);
   var deleteBtn = root && root.querySelector('[data-wb-delete]');
   if (deleteBtn && !readOnly) {
     deleteBtn.addEventListener('click', function () {
-      var typed = window.prompt('Delete your website for good?\n\nIts sections, the published website and every image you uploaded are removed, and your domain shows your digital card. Messages from your contact form stay in your Contacts.\n\nType DELETE to confirm.');
+      var typed = window.prompt('Delete your website for good?\n\nIts sections, the published website and every image you uploaded are removed' + (hasDomain ? ', and your domain shows your digital card' : '') + '. Messages from your contact form stay in your Contacts.\n\nType DELETE to confirm.');
       if (typed === null) return;
       if (typed.trim().toUpperCase() !== 'DELETE') {
         EVO.toast('Not deleted: type DELETE to confirm.', 'error');
@@ -39,7 +42,7 @@
   var schema = data.schema;
   var site = JSON.parse(JSON.stringify(data.site));
   var open = null; // id of the section being edited
-  var MAX_SECTIONS = 20;
+  var MAX_SECTIONS = data.maxSections || 30;
   var saving = false;
   var again = false;
   var savedEl = root.querySelector('[data-wb-saved]');
@@ -66,6 +69,30 @@
     });
     return d;
   }
+  // What a newly added section starts with (the rest of its fields are empty), so it shows in the preview.
+  var STARTERS = {
+    imagetext: { title: 'Title', text: 'Write a few lines here, then add an image.' },
+    banner: { heading: 'Your heading' },
+    pricing: { title: 'Packages', items: [{ name: 'Package name', price: 'Set your price', features: 'What is included\nOne item per line', buttonText: 'Get started', buttonLink: '#contact' }] },
+    steps: { title: 'How it works', items: [{ title: 'First step', text: '' }, { title: 'Second step', text: '' }, { title: 'Third step', text: '' }] },
+    stats: { title: 'In numbers', items: [{ value: '0', label: 'What it counts' }] },
+    team: { title: 'Team', items: [{ name: 'Name', role: 'Role' }] },
+    logos: { title: 'Partners', items: [{ name: 'Partner name' }] },
+    location: { title: 'Location & hours', hours: [{ day: 'Monday – Friday', time: '9:00 AM – 6:00 PM' }] },
+    links: { title: 'Links', items: [{ label: 'Button text', link: '' }] },
+  };
+  function starter(type) {
+    var fields = schema.sections[type].fields;
+    var d = defaults(fields);
+    var s = STARTERS[type] || {};
+    Object.keys(s).forEach(function (k) {
+      d[k] = Array.isArray(s[k])
+        ? s[k].map(function (item) { return Object.assign(defaults(fields[k].fields), item); })
+        : s[k];
+    });
+    return d;
+  }
+
   function newId(type) {
     return type + '-' + Math.random().toString(16).slice(2, 6);
   }
@@ -166,6 +193,34 @@
   function renderAll() {
     renderSettings();
     renderSections();
+  }
+
+  /* ---------------- Start from a design ---------------- */
+
+  function renderDesigns() {
+    var box = root.querySelector('[data-wb-designs]');
+    if (!box) return;
+    box.innerHTML = (data.designs || []).map(function (d) {
+      return '<div class="evo-wb-design">' +
+        '<span class="evo-wb-swatch evo-wb-design-swatch">' + d.colors.map(function (c) { return '<i style="background:' + esc(c) + '"></i>'; }).join('') + '</span>' +
+        '<strong>' + esc(d.label) + '</strong><small>' + esc(d.description) + '</small>' +
+        '<small class="evo-wb-design-meta">' + esc(d.font) + ' font · ' + d.sections.length + ' sections: ' + esc(d.sections.join(', ')) + '</small>' +
+        '<button type="button" class="evo-wb-small" data-design="' + esc(d.key) + '" data-design-label="' + esc(d.label) + '"' + (readOnly ? ' disabled' : '') + '>Use this design</button></div>';
+    }).join('');
+  }
+
+  function useDesign(btn) {
+    if (!window.confirm('Start from the "' + btn.getAttribute('data-design-label') + '" design? It replaces your current draft. Your published website stays as it is until you publish again.')) return;
+    clearTimeout(saveTimer);
+    var restore = EVO.busy(btn, 'Working…');
+    EVO.api('site.design', { design: btn.getAttribute('data-design') })
+      .then(function (res) {
+        EVO.reload(res.message);
+      })
+      .catch(function (e) {
+        restore();
+        EVO.toast(e.message, 'error');
+      });
   }
 
   /* ---------------- Saving and the preview ---------------- */
@@ -300,6 +355,7 @@
     }
     var i = Number(t.getAttribute('data-i') || t.getAttribute('data-move') || t.getAttribute('data-hide') || t.getAttribute('data-dup') || t.getAttribute('data-del'));
     if (t.hasAttribute('data-open')) return toggleOpen(t.getAttribute('data-open'));
+    if (t.hasAttribute('data-design')) return useDesign(t);
     if (t.hasAttribute('data-theme')) {
       site.settings.theme = t.getAttribute('data-theme');
       renderSettings();
@@ -350,15 +406,20 @@
   }
 
   var addType = root.querySelector('[data-wb-add-type]');
-  addType.innerHTML = Object.keys(schema.sections).map(function (k) { return '<option value="' + esc(k) + '">' + esc(schema.sections[k].label) + '</option>'; }).join('');
+  // The section types, grouped ("Introduce yourself", "What you offer", …).
+  addType.innerHTML = Object.keys(schema.groups || {}).map(function (g) {
+    var types = Object.keys(schema.sections).filter(function (k) { return schema.sections[k].group === g; });
+    return types.length ? '<optgroup label="' + esc(schema.groups[g]) + '">' + types.map(function (k) { return '<option value="' + esc(k) + '">' + esc(schema.sections[k].label) + '</option>'; }).join('') + '</optgroup>' : '';
+  }).join('') + Object.keys(schema.sections).filter(function (k) { return !(schema.groups || {})[schema.sections[k].group]; }).map(function (k) { return '<option value="' + esc(k) + '">' + esc(schema.sections[k].label) + '</option>'; }).join('');
   root.querySelector('[data-wb-add]').addEventListener('click', function () {
     if (readOnly || site.sections.length >= MAX_SECTIONS) return;
     var type = addType.value;
-    var d = defaults(schema.sections[type].fields);
+    var d = starter(type);
     if (type === 'contact') {
       d.form = true;
       d.showEmail = true;
     }
+    if (type === 'shop') d.title = 'Shop';
     var sec = { id: type === 'contact' && !site.sections.some(function (s) { return s.id === 'contact'; }) ? 'contact' : newId(type), type: type, hidden: false, data: d };
     site.sections.push(sec);
     open = sec.id;
@@ -395,9 +456,10 @@
     });
   }
   action(root.querySelector('[data-wb-publish]'), 'site.publish');
-  action(root.querySelector('[data-wb-unpublish]'), 'site.unpublish', 'Take down your website? Visitors of your domain will see your digital card again. Your draft is kept, so you can publish it again any time.');
+  action(root.querySelector('[data-wb-unpublish]'), 'site.unpublish', 'Take down your website? ' + (hasDomain ? 'Visitors of your domain will see your digital card again.' : 'Your card will no longer link to it.') + ' Your draft is kept, so you can publish it again any time.');
   action(root.querySelector('[data-wb-reset]'), 'site.reset', 'Start again from your card profile? Your current draft is replaced (the published website stays until you publish again).');
 
+  renderDesigns();
   renderAll();
   if (readOnly) savedEl.textContent = 'Read-only';
 })();

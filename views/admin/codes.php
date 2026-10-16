@@ -2,7 +2,8 @@
 /**
  * Management Admin > Activation Codes (superadmin only): generate codes,
  * verify a code (and PIN), and the code logs (serial, package, code, PIN,
- * status, used by, date used) where unused codes are activated or
+ * status, used by, date used), filtered by search, status, package and a
+ * serial range (SN-000001 to SN-000010), where unused codes are activated or
  * deactivated one at a time or in bulk (tick several, or select every
  * matching code), and the selected codes are downloaded as CSV (used ones
  * too). Actions go through api/actions/admin_codes.php
@@ -19,15 +20,26 @@ $cdFounder = find_code_owner('MMM-88001');
 $cdQ = mb_substr(trim(is_string($_GET['q'] ?? null) ? $_GET['q'] : ''), 0, 100);
 $cdStatus = is_string($_GET['status'] ?? null) && isset(CODE_STATUSES[$_GET['status']]) ? $_GET['status'] : '';
 $cdPackage = is_string($_GET['package'] ?? null) && isset(CODE_PACKAGES[$_GET['package']]) ? $_GET['package'] : '';
+// Serial range (SN-000001 to SN-000010; either end may be left open).
+$cdFromIn = mb_substr(trim(is_string($_GET['from'] ?? null) ? $_GET['from'] : ''), 0, 20);
+$cdToIn = mb_substr(trim(is_string($_GET['to'] ?? null) ? $_GET['to'] : ''), 0, 20);
+[$cdFrom, $cdTo, $cdRangeError] = code_serial_range($cdFromIn, $cdToIn);
+$cdFromText = $cdRangeError === null && $cdFrom !== null ? code_serial($cdFrom) : $cdFromIn;
+$cdToText = $cdRangeError === null && $cdTo !== null ? code_serial($cdTo) : $cdToIn;
+$cdRange = $cdFrom !== null || $cdTo !== null
+    ? ($cdFrom !== null && $cdTo !== null ? ($cdFrom === $cdTo ? code_serial($cdFrom) : code_serial($cdFrom) . ' – ' . code_serial($cdTo))
+        : ($cdFrom !== null ? code_serial($cdFrom) . ' onwards' : 'up to ' . code_serial($cdTo)))
+    : '';
 $cdPage = max(1, (int) ($_GET['page'] ?? 1));
-[$cdRows, $cdTotal] = admin_list_codes($cdQ, $cdStatus, $cdPackage, $cdPage);
+[$cdRows, $cdTotal] = admin_list_codes($cdQ, $cdStatus, $cdPackage, $cdPage, $cdFrom, $cdTo);
 $cdPages = max(1, (int) ceil($cdTotal / CODES_PER_PAGE));
 if ($cdPage > $cdPages) {
     $cdPage = $cdPages;
-    [$cdRows, $cdTotal] = admin_list_codes($cdQ, $cdStatus, $cdPackage, $cdPage);
+    [$cdRows, $cdTotal] = admin_list_codes($cdQ, $cdStatus, $cdPackage, $cdPage, $cdFrom, $cdTo);
 }
-$cdFiltered = $cdQ !== '' || $cdStatus !== '' || $cdPackage !== '';
-$cdPageUrl = fn (int $to): string => url('admin', array_filter(['tab' => 'codes', 'q' => $cdQ, 'status' => $cdStatus, 'package' => $cdPackage, 'page' => $to > 1 ? $to : '']));
+$cdFiltered = $cdQ !== '' || $cdStatus !== '' || $cdPackage !== '' || $cdRange !== '';
+$cdPageUrl = fn (int $to): string => url('admin', array_filter(['tab' => 'codes', 'q' => $cdQ, 'status' => $cdStatus, 'package' => $cdPackage,
+    'from' => $cdFrom !== null ? code_serial($cdFrom) : '', 'to' => $cdTo !== null ? code_serial($cdTo) : '', 'page' => $to > 1 ? $to : '']));
 ?>
 <div class="space-y-4" id="admin-codes">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -118,7 +130,7 @@ $cdPageUrl = fn (int $to): string => url('admin', array_filter(['tab' => 'codes'
             <h3 class="text-sm font-bold text-white">Activation Code Logs</h3>
             <p class="text-xs text-zinc-400">Every code, generated here or bought by members in their backoffice. Unused codes can be deactivated and activated again.</p>
         </div>
-        <form method="get" action="<?= e(base_path()) ?>/index.php" role="search" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+        <form method="get" action="<?= e(base_path()) ?>/index.php" role="search" class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full md:w-auto">
             <input type="hidden" name="view" value="admin">
             <input type="hidden" name="tab" value="codes">
             <div class="relative w-full sm:w-72">
@@ -137,16 +149,25 @@ $cdPageUrl = fn (int $to): string => url('admin', array_filter(['tab' => 'codes'
                     <option value="<?= e($cdValue) ?>"<?= $cdValue === $cdPackage ? ' selected' : '' ?>><?= e(code_package_label($cdValue)) ?></option>
                 <?php endforeach; ?>
             </select>
+            <div class="flex items-center gap-1.5" role="group" aria-label="Serial range">
+                <span class="text-[11px] text-zinc-400">Serial</span>
+                <input name="from" type="text" value="<?= e($cdFromText) ?>" maxlength="20" autocomplete="off" spellcheck="false" placeholder="SN-000001" aria-label="Serial from" aria-invalid="<?= $cdRangeError !== null ? 'true' : 'false' ?>" class="w-24 px-2.5 py-2 rounded-xl bg-zinc-900 border <?= $cdRangeError !== null ? 'border-rose-500/40' : 'border-zinc-700' ?> text-xs text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-[#f3bd35]">
+                <span class="text-[11px] text-zinc-400">to</span>
+                <input name="to" type="text" value="<?= e($cdToText) ?>" maxlength="20" autocomplete="off" spellcheck="false" placeholder="SN-000010" aria-label="Serial to" aria-invalid="<?= $cdRangeError !== null ? 'true' : 'false' ?>" class="w-24 px-2.5 py-2 rounded-xl bg-zinc-900 border <?= $cdRangeError !== null ? 'border-rose-500/40' : 'border-zinc-700' ?> text-xs text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-[#f3bd35]">
+            </div>
             <button type="submit" class="px-4 py-2 bg-[#f3bd35] hover:bg-[#ffda72] text-black text-xs font-extrabold rounded-xl transition-colors">Apply</button>
             <?php if ($cdFiltered): ?>
                 <a href="<?= e(url('admin', ['tab' => 'codes'])) ?>" class="px-3 py-2 text-xs text-zinc-400 hover:text-white text-center">Clear</a>
             <?php endif; ?>
         </form>
     </div>
+    <?php if ($cdRangeError !== null): ?>
+        <p role="alert" class="px-4 py-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300">Serial range not applied: <?= e($cdRangeError) ?></p>
+    <?php endif; ?>
 
-    <div class="rounded-3xl bg-[#111111] border border-[#f3bd35]/20 overflow-hidden shadow-xl" data-cd-logs data-filter-q="<?= e($cdQ) ?>" data-filter-status="<?= e($cdStatus) ?>" data-filter-package="<?= e($cdPackage) ?>" data-selectable-total="<?= $cdTotal ?>">
+    <div class="rounded-3xl bg-[#111111] border border-[#f3bd35]/20 overflow-hidden shadow-xl" data-cd-logs data-filter-q="<?= e($cdQ) ?>" data-filter-status="<?= e($cdStatus) ?>" data-filter-package="<?= e($cdPackage) ?>" data-filter-from="<?= e($cdFrom !== null ? code_serial($cdFrom) : '') ?>" data-filter-to="<?= e($cdTo !== null ? code_serial($cdTo) : '') ?>" data-selectable-total="<?= $cdTotal ?>">
         <div class="px-4 py-3 border-b border-zinc-800 text-[11px] text-zinc-400">
-            <?= number_format($cdTotal) ?> <?= $cdTotal === 1 ? 'code' : 'codes' ?><?= $cdFiltered ? ' match these filters' : '' ?>
+            <?= number_format($cdTotal) ?> <?= $cdTotal === 1 ? 'code' : 'codes' ?><?= $cdFiltered ? ' match these filters' : '' ?><?php if ($cdRange !== ''): ?> · serial <span class="font-mono text-[#ffda72]"><?= e($cdRange) ?></span><?php endif; ?>
         </div>
         <div data-cd-bulk-bar hidden class="px-4 py-3 border-b border-[#f3bd35]/30 bg-[#f3bd35]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs" role="region" aria-label="Selected codes">
             <div class="text-zinc-200">

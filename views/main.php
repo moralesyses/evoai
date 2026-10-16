@@ -1,18 +1,10 @@
 <?php
 /**
  * Main Portal: hero, executive sign-in / registration gateway, architecture
- * pillars, leadership council and footer.
+ * pillars and footer.
  */
 $mainPlan = mlm_complan(); // binary plan figures quoted on the page
-$demoUsers = [
-    ['name' => 'Mike Maranan', 'role' => 'admin', 'roleLabel' => 'Super Admin / CEO', 'email' => 'mike@mmmcircle.com', 'password' => 'admin88', 'avatar' => 'assets/images/mike_maranan_executive_portrait.svg', 'color' => 'from-amber-400 to-yellow-600'],
-    ['name' => 'Sofia Cruz', 'role' => 'vip', 'roleLabel' => "Chairman's Circle (VIP)", 'email' => 'sofia.cruz@apexholdings.ph', 'password' => 'vip88', 'avatar' => null, 'color' => 'from-purple-400 to-indigo-600'],
-    ['name' => 'David Tan', 'role' => 'member', 'roleLabel' => 'Executive Member', 'email' => 'david.tan@horizoncap.sg', 'password' => 'member88', 'avatar' => null, 'color' => 'from-emerald-400 to-teal-600'],
-    ['name' => 'Elena Santos', 'role' => 'member', 'roleLabel' => 'Executive Member', 'email' => 'elena@biotechcorp.ph', 'password' => 'member88', 'avatar' => null, 'color' => 'from-blue-400 to-cyan-600'],
-];
-$demo = demo_mode();
 $pageScripts[] = 'assets/js/views/main.js';
-$pageData['demoUsers'] = $demo ? array_map(fn ($d) => ['name' => $d['name'], 'role' => $d['role'], 'roleLabel' => $d['roleLabel'], 'email' => $d['email'], 'password' => $d['password']], $demoUsers) : [];
 
 $authOn = 'bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black shadow-md';
 $authOff = 'text-zinc-400 hover:text-white';
@@ -26,6 +18,8 @@ $pkgOff = 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700';
 // or with an activation code + PIN (includes/activation_codes.php).
 $regPrices = ['membership_executive' => checkout_item('membership_executive')['price'], 'membership_chairmans' => checkout_item('membership_chairmans')['price']];
 $regMaya = maya_enabled();
+// A sign-up link can choose the package (&package=membership_chairmans, e.g. a card's Chairman's Circle button).
+$regPackage = isset($regPrices[$_GET['package'] ?? '']) ? (string) $_GET['package'] : 'membership_executive';
 ?>
 <div class="w-full text-[#f7f5ef] pb-16">
     <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -54,12 +48,12 @@ $regMaya = maya_enabled();
                     <span class="text-[10px] px-2 py-0.5 rounded-md bg-[#f3bd35]/20 text-[#ffda72] font-mono font-medium">v2.6</span>
                 </div>
                 <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.12]">Sovereign Digital Identity &amp; <span class="bg-gradient-to-r from-[#ffda72] via-[#f3bd35] to-amber-400 bg-clip-text text-transparent">Executive Syndicate.</span></h1>
-                <p class="mt-4 sm:mt-6 text-base sm:text-lg text-zinc-300 leading-relaxed max-w-2xl font-normal">Empowering global entrepreneurs, investors, and high-net-worth leaders with smart NFC identity cards, zero-knowledge encrypted communications, verified lead generation, and automated binary backoffice management.</p>
+                <p class="mt-4 sm:mt-6 text-base sm:text-lg text-zinc-300 leading-relaxed max-w-2xl font-normal">Empowering global entrepreneurs, investors, and high-net-worth leaders with smart NFC identity cards, zero-knowledge encrypted communications, verified lead generation, and an automated member backoffice for community rewards.</p>
                 <div class="grid grid-cols-2 sm:grid-cols-2 gap-3 mt-6">
                     <?php foreach ([
                         ['credit-card', 'bg-[#f3bd35]/15 border border-[#f3bd35]/30 text-[#f3bd35]', 'Smart NFC Card & VCard', 'Instant tap-to-share contactless profile & CRM capture'],
                         ['message-square-lock', 'bg-purple-500/15 border border-purple-500/30 text-purple-400', 'E2EE Cryptographic Comms', 'Military-grade AES-GCM & ECDH executive chat'],
-                        ['trending-up', 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400', 'Binary Complan Backoffice', '₱' . num($mainPlan['entryFee']) . ' entry, direct referrals, & ₱' . num($mainPlan['maxDailyPairingIncome']) . ' daily pairing'],
+                        ['trending-up', 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400', 'Rewards Plan Backoffice', '₱' . num($mainPlan['entryFee']) . ' entry, referral rewards, & up to ₱' . num($mainPlan['maxDailyPairingIncome']) . ' daily match bonus'],
                         ['shield', 'bg-blue-500/15 border border-blue-500/30 text-blue-400', 'Enterprise Management', 'Role permissions, real-time leads, and payment audits'],
                     ] as [$ic, $tone, $title, $desc]): ?>
                         <div class="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800 hover:border-[#f3bd35]/40 transition-colors flex items-start gap-3">
@@ -72,9 +66,11 @@ $regMaya = maya_enabled();
                     <?php endforeach; ?>
                 </div>
                 <div class="mt-8 flex flex-wrap items-center gap-3">
+                    <?php if ($user): // visitors see no member's card from the portal (only from links members share) ?>
                     <a href="<?= e(url('card', ['profile' => 'usr_mike'])) ?>" class="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-bold text-xs sm:text-sm hover:brightness-110 shadow-lg shadow-[#f3bd35]/20 transition-all cursor-pointer">
                         <?= icon('user', 'w-4 h-4') ?><span>Explore Mike Maranan 1EVOAI Card</span><?= icon('chevron-right', 'w-4 h-4') ?>
                     </a>
+                    <?php endif; ?>
                     <button type="button" id="hero-signin" class="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-[#f3bd35]/50 text-white font-semibold text-xs sm:text-sm transition-all cursor-pointer">
                         <?= icon('key', 'w-4 h-4 text-[#f3bd35]') ?><span>Executive Sign In</span>
                     </button>
@@ -149,7 +145,7 @@ $regMaya = maya_enabled();
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400"><?= icon('lock', 'w-4 h-4') ?></div>
                                 <input id="login-password" name="password" type="password" required autocomplete="current-password" placeholder="Enter your security password" class="w-full pl-10 pr-11 py-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[#f3bd35] focus:ring-1 focus:ring-[#f3bd35] text-white text-sm placeholder-zinc-500 transition-all outline-none">
-                                <button type="button" data-toggle-password="login-password" data-title-shown="Hide password" data-title-hidden="Show password" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-400 hover:text-zinc-200 transition-colors" title="Show password">
+                                <button type="button" data-toggle-password="login-password" data-title-shown="Hide password" data-title-hidden="Show password" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-400 hover:text-zinc-200 transition-colors" title="Show password" aria-label="Show password" aria-pressed="false">
                                     <span data-when-hidden><?= icon('eye', 'w-4 h-4') ?></span><span data-when-shown hidden><?= icon('eye-off', 'w-4 h-4') ?></span>
                                 </button>
                             </div>
@@ -163,25 +159,6 @@ $regMaya = maya_enabled();
                         <button type="submit" class="w-full mt-2 py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#ffda72] to-[#f3bd35] hover:from-[#ffe085] hover:to-[#e5b02f] text-black font-extrabold text-sm tracking-wide flex items-center justify-center gap-2 shadow-xl shadow-[#f3bd35]/25 transition-all cursor-pointer disabled:opacity-60">
                             <span>Sign In to Executive Portal</span><?= icon('arrow-right', 'w-4 h-4') ?>
                         </button>
-                        <?php if ($demo): ?>
-                            <div class="pt-5 border-t border-zinc-800">
-                                <div class="flex items-center justify-between mb-2.5">
-                                    <span class="text-[10px] font-bold tracking-wider text-zinc-400 uppercase">Quick Demo Credentials (One-Click)</span>
-                                    <span class="text-[10px] text-zinc-400 font-mono">Instant Access</span>
-                                </div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <?php foreach ($demoUsers as $i => $d): ?>
-                                        <button type="button" data-demo-login="<?= $i ?>" class="flex items-center gap-2 p-2 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 hover:border-[#f3bd35]/40 text-left transition-all group">
-                                            <div class="w-7 h-7 rounded-lg bg-gradient-to-br <?= $d['color'] ?> text-black font-black text-xs flex items-center justify-center shrink-0 shadow-sm"><?= e(mb_substr($d['name'], 0, 1)) ?></div>
-                                            <div class="min-w-0 flex-1">
-                                                <div class="text-xs font-bold text-white group-hover:text-[#ffda72] truncate"><?= e($d['name']) ?></div>
-                                                <div class="text-[10px] text-zinc-400 truncate font-mono"><?= e($d['roleLabel']) ?></div>
-                                            </div>
-                                        </button>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
                     </form>
 
                     <form id="register-form" data-tab-panel="register" data-group="auth" hidden class="space-y-3.5" novalidate>
@@ -206,33 +183,37 @@ $regMaya = maya_enabled();
                             <div>
                                 <label for="reg-password" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Password</label>
                                 <div class="relative">
-                                    <input id="reg-password" name="password" type="password" required minlength="6" autocomplete="new-password" placeholder="Min. 6 chars" class="w-full px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[#f3bd35] text-white text-sm placeholder-zinc-500 outline-none">
+                                    <input id="reg-password" name="password" type="password" required minlength="6" autocomplete="new-password" placeholder="Min. 6 chars" class="w-full pl-3.5 pr-11 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[#f3bd35] text-white text-sm placeholder-zinc-500 outline-none">
+                                    <button type="button" data-toggle-password="reg-password" data-title-shown="Hide password" data-title-hidden="Show password" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-400 hover:text-zinc-200 transition-colors" title="Show password" aria-label="Show password" aria-pressed="false">
+                                        <span data-when-hidden><?= icon('eye', 'w-4 h-4') ?></span><span data-when-shown hidden><?= icon('eye-off', 'w-4 h-4') ?></span>
+                                    </button>
                                 </div>
                             </div>
                             <div>
                                 <label for="reg-confirm" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Confirm Password</label>
                                 <div class="relative">
-                                    <input id="reg-confirm" name="confirm" type="password" required autocomplete="new-password" placeholder="Repeat password" class="w-full px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[#f3bd35] text-white text-sm placeholder-zinc-500 outline-none">
+                                    <input id="reg-confirm" name="confirm" type="password" required autocomplete="new-password" placeholder="Repeat password" class="w-full pl-3.5 pr-11 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[#f3bd35] text-white text-sm placeholder-zinc-500 outline-none">
+                                    <button type="button" data-toggle-password="reg-confirm" data-title-shown="Hide password" data-title-hidden="Show password" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-400 hover:text-zinc-200 transition-colors" title="Show password" aria-label="Show password" aria-pressed="false">
+                                        <span data-when-hidden><?= icon('eye', 'w-4 h-4') ?></span><span data-when-shown hidden><?= icon('eye-off', 'w-4 h-4') ?></span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between text-xs">
-                            <button type="button" id="reg-toggle-pw" data-toggle-password="reg-password,reg-confirm" class="text-zinc-400 hover:text-zinc-200 flex items-center gap-1">
-                                <span data-when-hidden class="flex items-center gap-1"><?= icon('eye', 'w-3.5 h-3.5') ?><span>Show passwords</span></span>
-                                <span data-when-shown hidden class="flex items-center gap-1"><?= icon('eye-off', 'w-3.5 h-3.5') ?><span>Hide passwords</span></span>
-                            </button>
+                        <div class="flex items-center justify-end text-xs">
                             <span class="text-zinc-500 text-[11px]">E2EE Key Generated on Signup</span>
                         </div>
                         <?php
-                        // A member's sign-up link (?ref=MMM-xxxxx, e.g. {signup_link} in their emails) fills in their ID.
+                        // A member's sign-up link (?ref=MMM-xxxxx, e.g. {signup_link} in their emails) fills in their ID;
+                        // without one, the owner of the 1EVOAI card this browser came from (signup_remembered_referrer).
                         $mainSponsorSql = 'SELECT g.id, g.full_name, a.signup_placement FROM mlm_genealogy g LEFT JOIN mlm_accounts a ON a.id = g.id WHERE g.id = ?';
                         $mainRef = is_string($_GET['ref'] ?? null) ? strtoupper(mb_substr(trim($_GET['ref']), 0, 20)) : '';
+                        $mainRef = $mainRef !== '' ? $mainRef : signup_remembered_referrer();
                         $mainSponsor = ($mainRef !== '' ? db_one($mainSponsorSql, [$mainRef]) : null)
                             ?? db_one($mainSponsorSql, ['MMM-88001'])
                             ?? ['id' => 'MMM-88001', 'full_name' => 'Mike Maranan', 'signup_placement' => 'auto'];
                         ?>
                         <div>
-                            <label for="reg-sponsor" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Sponsor / Referral ID</label>
+                            <label for="reg-sponsor" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Referrer ID</label>
                             <div class="relative">
                                 <input id="reg-sponsor" name="sponsorId" type="text" value="<?= e($mainSponsor['id']) ?>" maxlength="20" placeholder="MMM-88001" class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[#f3bd35] text-white text-xs font-mono outline-none">
                                 <span id="reg-sponsor-status" class="absolute right-3 top-2.5 text-[10px] text-emerald-400 font-mono flex items-center gap-1"><?= icon('circle-check', 'w-3 h-3') ?><span data-sponsor-label>Verified (<?= e($mainSponsor['full_name']) ?>)</span></span>
@@ -242,14 +223,15 @@ $regMaya = maya_enabled();
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">Select Membership Package</label>
-                            <input type="hidden" name="package" id="reg-package" value="membership_executive">
+                            <input type="hidden" name="package" id="reg-package" value="<?= e($regPackage) ?>">
                             <div class="grid grid-cols-2 gap-2" role="radiogroup">
-                                <div role="radio" tabindex="0" aria-checked="true" data-package="membership_executive" data-price="<?= e(peso($regPrices['membership_executive'])) ?>" data-on="<?= $pkgOn ?>" data-off="<?= $pkgOff ?>" class="p-2.5 rounded-xl border cursor-pointer transition-all <?= $pkgOn ?>">
+                                <?php $regExec = $regPackage === 'membership_executive'; ?>
+                                <div role="radio" tabindex="0" aria-checked="<?= $regExec ? 'true' : 'false' ?>" data-package="membership_executive" data-price="<?= e(peso($regPrices['membership_executive'])) ?>" data-on="<?= $pkgOn ?>" data-off="<?= $pkgOff ?>" class="p-2.5 rounded-xl border cursor-pointer transition-all <?= $regExec ? $pkgOn : $pkgOff ?>">
                                     <div class="font-bold text-xs text-white">Executive Member</div>
                                     <div class="text-[#f3bd35] font-black text-xs mt-0.5"><?= peso($regPrices['membership_executive']) ?></div>
                                     <div class="text-[10px] text-zinc-400 mt-0.5">1 Smart NFC Card + Microsite</div>
                                 </div>
-                                <div role="radio" tabindex="0" aria-checked="false" data-package="membership_chairmans" data-price="<?= e(peso($regPrices['membership_chairmans'])) ?>" data-on="<?= $pkgOn ?>" data-off="<?= $pkgOff ?>" class="p-2.5 rounded-xl border cursor-pointer transition-all <?= $pkgOff ?>">
+                                <div role="radio" tabindex="0" aria-checked="<?= $regExec ? 'false' : 'true' ?>" data-package="membership_chairmans" data-price="<?= e(peso($regPrices['membership_chairmans'])) ?>" data-on="<?= $pkgOn ?>" data-off="<?= $pkgOff ?>" class="p-2.5 rounded-xl border cursor-pointer transition-all <?= $regExec ? $pkgOff : $pkgOn ?>">
                                     <div class="font-bold text-xs text-white">Chairman's Circle</div>
                                     <div class="text-[#f3bd35] font-black text-xs mt-0.5"><?= peso($regPrices['membership_chairmans']) ?></div>
                                     <div class="text-[10px] text-zinc-400 mt-0.5">7 Cards + Mastermind VIP</div>
@@ -262,11 +244,11 @@ $regMaya = maya_enabled();
                             <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Pay with">
                                 <div role="radio" tabindex="0" aria-checked="<?= $regMaya ? 'true' : 'false' ?>" aria-disabled="<?= $regMaya ? 'false' : 'true' ?>" data-pay-with="maya" data-on="<?= $pkgOn ?>" data-off="<?= $pkgOff ?>" class="p-2.5 rounded-xl border transition-all <?= $regMaya ? $pkgOn . ' cursor-pointer' : $pkgOff . ' opacity-50 cursor-not-allowed' ?>">
                                     <div class="font-bold text-xs text-white flex items-center gap-1.5"><?= icon('credit-card', 'w-3.5 h-3.5 text-[#f3bd35]') ?>Online Checkout</div>
-                                    <div class="text-[10px] text-zinc-400 mt-0.5"><?= $regMaya ? 'Maya wallet or card' : 'Not available yet' ?></div>
+                                    <div class="text-[10px] text-zinc-400 mt-0.5"><?= $regMaya ? 'Maya wallet or card' : e(MAYA_UNAVAILABLE) ?></div>
                                 </div>
                                 <div role="radio" tabindex="0" aria-checked="<?= $regMaya ? 'false' : 'true' ?>" data-pay-with="code" data-on="<?= $pkgOn ?>" data-off="<?= $pkgOff ?>" class="p-2.5 rounded-xl border cursor-pointer transition-all <?= $regMaya ? $pkgOff : $pkgOn ?>">
                                     <div class="font-bold text-xs text-white flex items-center gap-1.5"><?= icon('key', 'w-3.5 h-3.5 text-[#f3bd35]') ?>Activation Code</div>
-                                    <div class="text-[10px] text-zinc-400 mt-0.5">Code + PIN from your sponsor</div>
+                                    <div class="text-[10px] text-zinc-400 mt-0.5">Code + PIN from your referrer</div>
                                 </div>
                             </div>
                         </div>
@@ -292,18 +274,11 @@ $regMaya = maya_enabled();
                             <span data-pay-note="code"<?= $regMaya ? ' hidden' : '' ?>>Your account is created right away with a valid, active code for the package you selected. Each code works once.</span>
                         </p>
                         <button type="submit" class="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-extrabold text-sm tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-[#f3bd35]/20 cursor-pointer disabled:opacity-60">
-                            <span data-pay-label="maya"<?= $regMaya ? '' : ' hidden' ?>>Continue to Payment · <span data-reg-amount><?= peso($regPrices['membership_executive']) ?></span></span>
+                            <span data-pay-label="maya"<?= $regMaya ? '' : ' hidden' ?>>Continue to Payment · <span data-reg-amount><?= peso($regPrices[$regPackage]) ?></span></span>
                             <span data-pay-label="code"<?= $regMaya ? ' hidden' : '' ?>>Activate My Account</span><?= icon('arrow-right', 'w-4 h-4') ?>
                         </button>
                     </form>
 
-                    <div class="mt-5 pt-4 border-t border-zinc-800/80 text-center">
-                        <a href="<?= e(url('card', ['profile' => 'usr_mike'])) ?>" class="text-xs text-zinc-400 hover:text-[#f3bd35] transition-colors inline-flex items-center gap-1.5">
-                            <span>Don't have credentials yet?</span>
-                            <span class="text-[#ffda72] font-semibold underline underline-offset-2">Preview Public Card as Guest</span>
-                            <?= icon('external-link', 'w-3 h-3 text-[#ffda72]') ?>
-                        </a>
-                    </div>
                 </div>
             </div>
         </div>
@@ -315,7 +290,7 @@ $regMaya = maya_enabled();
                 <p class="mt-3 text-sm sm:text-base text-zinc-400">Explore how each component of the 1EVOAI ecosystem powers high-conviction dealmaking and sovereign operations.</p>
             </div>
             <div class="flex flex-wrap items-center justify-center gap-2 mb-8" data-tab-group="pillars" role="tablist">
-                <?php foreach ([['nfc', 'smartphone', 'NFC Smart Card'], ['e2ee', 'message-square-lock', 'E2EE Cryptographic Comms'], ['backoffice', 'trending-up', 'Binary MLM Backoffice'], ['syndicate', 'award', 'Syndicate & Governance']] as $i => [$id, $ic, $label]): ?>
+                <?php foreach ([['nfc', 'smartphone', 'NFC Smart Card'], ['e2ee', 'message-square-lock', 'E2EE Cryptographic Comms'], ['backoffice', 'trending-up', 'Member Backoffice'], ['syndicate', 'award', 'Syndicate & Governance']] as $i => [$id, $ic, $label]): ?>
                     <button type="button" data-tab="<?= $id ?>" data-group="pillars" data-on="<?= $pillarOn ?>" data-off="<?= $pillarOff ?>" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 <?= $i === 0 ? $pillarOn : $pillarOff ?>">
                         <?= icon($ic, 'w-4 h-4') ?><span><?= e($label) ?></span>
                     </button>
@@ -366,25 +341,25 @@ $regMaya = maya_enabled();
                 </div>
                 <div data-tab-panel="backoffice" data-group="pillars" hidden class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                     <div>
-                        <span class="text-xs font-mono text-emerald-400 uppercase tracking-wider block mb-2">WEALTH COMPLAN &amp; NETWORK ENGINE</span>
-                        <h3 class="text-2xl sm:text-3xl font-black text-white">88MMM Binary Backoffice</h3>
-                        <p class="mt-3 text-sm text-zinc-300 leading-relaxed">Automated affiliate and network growth engine built on a transparent binary compensation structure: ₱<?= num($mainPlan['entryFee']) ?> package entry, ₱<?= num($mainPlan['directReferralBonus']) ?> direct referral, ₱<?= num($mainPlan['pairingBonus']) ?> pairing bonus, and up to ₱<?= num($mainPlan['maxDailyPairingIncome']) ?>/day pairing ceiling across <?= $mainPlan['cyclesPerDay'] === 1 ? '1 cycle' : $mainPlan['cyclesPerDay'] . ' cycles' ?> daily.</p>
+                        <span class="text-xs font-mono text-emerald-400 uppercase tracking-wider block mb-2">COMMUNITY REWARDS PLAN &amp; TEAM ENGINE</span>
+                        <h3 class="text-2xl sm:text-3xl font-black text-white">88MMM Member Backoffice</h3>
+                        <p class="mt-3 text-sm text-zinc-300 leading-relaxed">Automated community rewards and team growth engine built on a transparent two-team rewards plan: ₱<?= num($mainPlan['entryFee']) ?> package entry, ₱<?= num($mainPlan['directReferralBonus']) ?> referral bonus, ₱<?= num($mainPlan['pairingBonus']) ?> match bonus, and up to ₱<?= num($mainPlan['maxDailyPairingIncome']) ?>/day in match bonuses across <?= $mainPlan['cyclesPerDay'] === 1 ? '1 round' : $mainPlan['cyclesPerDay'] . ' rounds' ?> daily.</p>
                         <ul class="mt-6 space-y-2.5 text-xs text-zinc-300">
-                            <li class="flex items-center gap-2"><?= icon('circle-check', 'w-4 h-4 text-emerald-400') ?>Interactive Binary Tree &amp; Unilevel genealogical visualizer</li>
-                            <li class="flex items-center gap-2"><?= icon('circle-check', 'w-4 h-4 text-emerald-400') ?>Live Commission Wallet with instant GCash, Maya &amp; Bank encashment</li>
-                            <li class="flex items-center gap-2"><?= icon('circle-check', 'w-4 h-4 text-emerald-400') ?>Integrated Merchandise &amp; NFC Hardware Shop with PV/BV tracking</li>
+                            <li class="flex items-center gap-2"><?= icon('circle-check', 'w-4 h-4 text-emerald-400') ?>Interactive Team Tree &amp; Referral Tree visualizer</li>
+                            <li class="flex items-center gap-2"><?= icon('circle-check', 'w-4 h-4 text-emerald-400') ?>Live Rewards Wallet with instant GCash, Maya &amp; Bank withdrawals</li>
+                            <li class="flex items-center gap-2"><?= icon('circle-check', 'w-4 h-4 text-emerald-400') ?>Integrated Merchandise &amp; NFC Hardware Shop with points tracking</li>
                         </ul>
                         <div class="mt-6">
                             <a href="<?= e(url('backoffice')) ?>" class="px-5 py-2.5 rounded-xl bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 inline-flex items-center gap-2"><span>Enter Member Backoffice</span><?= icon('arrow-right', 'w-3.5 h-3.5') ?></a>
                         </div>
                     </div>
                     <div class="p-6 rounded-2xl bg-zinc-950 border border-emerald-500/30 text-xs space-y-4">
-                        <div class="text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-800 pb-2">Binary Complan Architecture</div>
+                        <div class="text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-800 pb-2">Rewards Plan Architecture</div>
                         <div class="grid grid-cols-2 gap-3">
                             <div class="p-3 rounded-xl bg-zinc-900 border border-zinc-800"><div class="text-[11px] text-zinc-400">Entry Package</div><div class="text-lg font-bold text-white mt-0.5">₱2,000 PHP</div><div class="text-[10px] text-emerald-400 mt-0.5">1 Card + Full Portal</div></div>
-                            <div class="p-3 rounded-xl bg-zinc-900 border border-zinc-800"><div class="text-[11px] text-zinc-400">Direct Sponsor</div><div class="text-lg font-bold text-white mt-0.5">₱<?= num($mainPlan['directReferralBonus']) ?> PHP</div><div class="text-[10px] text-emerald-400 mt-0.5">Instant credit</div></div>
-                            <div class="p-3 rounded-xl bg-zinc-900 border border-zinc-800"><div class="text-[11px] text-zinc-400">Pairing Bonus</div><div class="text-lg font-bold text-white mt-0.5">₱<?= num($mainPlan['pairingBonus']) ?> PHP</div><div class="text-[10px] text-emerald-400 mt-0.5">Per Left + Right Match</div></div>
-                            <div class="p-3 rounded-xl bg-zinc-900 border border-zinc-800"><div class="text-[11px] text-zinc-400">Max Daily Pairing</div><div class="text-lg font-bold text-[#ffda72] mt-0.5">₱<?= num($mainPlan['maxDailyPairingIncome']) ?> PHP</div><div class="text-[10px] text-zinc-400 mt-0.5"><?= $mainPlan['maxPairsPerCycle'] ?> Pairs x <?= $mainPlan['cyclesPerDay'] ?> Cycle<?= $mainPlan['cyclesPerDay'] === 1 ? '' : 's' ?></div></div>
+                            <div class="p-3 rounded-xl bg-zinc-900 border border-zinc-800"><div class="text-[11px] text-zinc-400">Referral Bonus</div><div class="text-lg font-bold text-white mt-0.5">₱<?= num($mainPlan['directReferralBonus']) ?> PHP</div><div class="text-[10px] text-emerald-400 mt-0.5">Instant credit</div></div>
+                            <div class="p-3 rounded-xl bg-zinc-900 border border-zinc-800"><div class="text-[11px] text-zinc-400">Match Bonus</div><div class="text-lg font-bold text-white mt-0.5">₱<?= num($mainPlan['pairingBonus']) ?> PHP</div><div class="text-[10px] text-emerald-400 mt-0.5">Per Left + Right Match</div></div>
+                            <div class="p-3 rounded-xl bg-zinc-900 border border-zinc-800"><div class="text-[11px] text-zinc-400">Max Daily Match Bonus</div><div class="text-lg font-bold text-[#ffda72] mt-0.5">₱<?= num($mainPlan['maxDailyPairingIncome']) ?> PHP</div><div class="text-[10px] text-zinc-400 mt-0.5"><?= $mainPlan['maxPairsPerCycle'] ?> Matches x<?= $mainPlan['cyclesPerDay'] ?> Round<?= $mainPlan['cyclesPerDay'] === 1 ? '' : 's' ?></div></div>
                         </div>
                     </div>
                 </div>
@@ -409,47 +384,6 @@ $regMaya = maya_enabled();
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <div class="mt-20 pt-12 border-t border-zinc-800">
-            <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-                <div>
-                    <span class="text-xs font-mono text-[#f3bd35] uppercase tracking-wider block mb-1">EXECUTIVE COUNCIL</span>
-                    <h2 class="text-2xl sm:text-3xl font-extrabold text-white">Founding Leadership &amp; Board of Advisors</h2>
-                </div>
-                <p class="text-xs sm:text-sm text-zinc-400 max-w-md">The visionary minds directing the 88MMM Circle ecosystem and 1EVOAI digital infrastructure.</p>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <?php foreach ($demoUsers as $i => $d): ?>
-                    <div class="p-5 rounded-2xl bg-zinc-900/60 border border-zinc-800 hover:border-[#f3bd35]/40 transition-all flex flex-col justify-between group">
-                        <div>
-                            <div class="flex items-center gap-3 mb-3">
-                                <?php if ($d['avatar']): ?>
-                                    <img src="<?= e(media_url($d['avatar'])) ?>" alt="<?= e($d['name']) ?>" class="w-12 h-12 rounded-full object-cover border border-[#f3bd35]/40">
-                                <?php else: ?>
-                                    <div class="w-12 h-12 rounded-full bg-gradient-to-br <?= $d['color'] ?> text-black font-extrabold text-lg flex items-center justify-center"><?= e(mb_substr($d['name'], 0, 1)) ?></div>
-                                <?php endif; ?>
-                                <div>
-                                    <h4 class="text-sm font-bold text-white group-hover:text-[#ffda72] transition-colors"><?= e($d['name']) ?></h4>
-                                    <div class="text-[11px] text-zinc-400"><?= e($d['roleLabel']) ?></div>
-                                </div>
-                            </div>
-                            <div class="text-[11px] text-zinc-400 font-mono"><?= e($d['email']) ?></div>
-                        </div>
-                        <div class="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between">
-                            <?php if ($demo): ?>
-                                <button type="button" data-demo-login="<?= $i ?>" class="text-xs text-[#f3bd35] hover:text-[#ffda72] font-semibold flex items-center gap-1">
-                                    <span>Sign in as <?= e(explode(' ', $d['name'])[0]) ?></span><?= icon('arrow-right', 'w-3 h-3') ?>
-                                </button>
-                            <?php else: ?>
-                                <a href="<?= e(url('card', ['profile' => 'usr_' . strtolower(explode(' ', $d['name'])[0])])) ?>" class="text-xs text-[#f3bd35] hover:text-[#ffda72] font-semibold flex items-center gap-1">
-                                    <span>View <?= e(explode(' ', $d['name'])[0]) ?>'s Card</span><?= icon('arrow-right', 'w-3 h-3') ?>
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
             </div>
         </div>
 

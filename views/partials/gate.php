@@ -15,7 +15,6 @@ $gateText = $gateText ?? 'This area of the 88MMM Executive Portal is reserved fo
         <p class="text-xs text-zinc-400 max-w-sm mx-auto mb-5 leading-relaxed"><?= e($gateText) ?></p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-2 max-w-sm mx-auto">
             <a href="<?= e(url('main')) ?>#auth-gateway-card" class="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-extrabold text-xs rounded-xl shadow-lg hover:brightness-105 transition-all flex items-center justify-center gap-2"><?= icon('key', 'w-3.5 h-3.5') ?><span>Executive Sign In</span></a>
-            <a href="<?= e(url('card')) ?>" class="w-full sm:w-auto px-6 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2"><?= icon('credit-card', 'w-3.5 h-3.5 text-[#f3bd35]') ?><span>View Public Card</span></a>
         </div>
     </div>
 </div>

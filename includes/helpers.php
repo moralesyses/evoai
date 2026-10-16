@@ -42,7 +42,9 @@ function num($n): string
 /** Peso amount: ₱42,800 */
 function peso($n): string
 {
-    return '₱' . num($n);
+    $n = (float) $n;
+    // Whole amounts as ₱42,800; the others with two decimals (₱99.50, not ₱99.5).
+    return '₱' . (abs($n - round($n)) < 0.005 ? num($n) : number_format($n, 2, '.', ','));
 }
 
 function to_ts($value): int

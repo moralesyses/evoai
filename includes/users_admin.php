@@ -1,41 +1,135 @@
 <?php
 /**
  * Superadmin user management (Management Admin > Users).
- * Search by name, email or ID; sort by date joined; 25 per page; edit
- * account fields (only changed fields are written, with optimistic locking on
- * updated_at); delete with confirmation.
+ * Nobody is listed until the admin presses Show users (admin_user_filter()): filters for name (also
+ * email, user ID or one of the user's backoffice accounts), package, date activated and items per page;
+ * sort by date activated or name. Edit account fields (only changed fields are written, with optimistic
+ * locking on updated_at); delete with confirmation.
  */
 declare(strict_types=1);
 
 const USERS_PER_PAGE = 25;
+const USERS_PER_PAGE_CHOICES = [10, 25, 50, 100];
 const USER_SORTS = [
-    'newest' => ['Date joined: newest to oldest', 'u.created_at DESC, u.id DESC'],
-    'oldest' => ['Date joined: oldest to newest', 'u.created_at ASC, u.id ASC'],
+    'newest' => ['Date activated: newest to oldest', 'u.created_at DESC, u.id DESC'],
+    'oldest' => ['Date activated: oldest to newest', 'u.created_at ASC, u.id ASC'],
     'name'   => ['Name: A to Z', 'u.name ASC, u.id ASC'],
 ];
 const USER_STATUSES = ['active' => 'Active', 'suspended' => 'Suspended'];
+/** Package filter: the tier on the user's card profile (set at sign-up or by an upgrade payment; members can't edit it). */
+const USER_PACKAGES = ['executive' => 'Executive Member', 'chairmans' => "Chairman's Circle"];
 
-/** One page of users (with whether they have a card profile) and the total that match. */
-function admin_search_users(string $search, int $page, string $sort = 'newest'): array
+/**
+ * The Users list's filters from the query string, checked. 'show' is false until the admin presses
+ * Show users (nobody is listed by default); 'error' explains a filter that can't be used (nothing is
+ * listed then). Dates are YYYY-MM-DD, both ends included; "activated" is when the user's account
+ * was created (sign-ups are created once paid or activated with a code).
+ */
+function admin_user_filter(array $get): array
 {
-    $where = '';
+    $str = static fn (string $k, int $max): string => mb_substr(trim(is_string($get[$k] ?? null) ? $get[$k] : ''), 0, $max);
+    $date = static function (string $v): ?string {
+        $d = DateTimeImmutable::createFromFormat('!Y-m-d', $v);
+        return $d && $d->format('Y-m-d') === $v ? $v : null;
+    };
+    $f = [
+        'show' => ($get['show'] ?? '') === '1',
+        'q' => $str('q', 100),
+        'package' => isset(USER_PACKAGES[$get['package'] ?? '']) ? (string) $get['package'] : '',
+        'per' => in_array((int) ($get['per'] ?? 0), USERS_PER_PAGE_CHOICES, true) ? (int) $get['per'] : USERS_PER_PAGE,
+        'from' => $str('from', 10),
+        'to' => $str('to', 10),
+        'sort' => is_string($get['sort'] ?? null) && isset(USER_SORTS[$get['sort']]) ? $get['sort'] : 'newest',
+        'page' => max(1, (int) ($get['page'] ?? 1)),
+        'error' => '',
+    ];
+    foreach (['from' => 'Activated from', 'to' => 'Activated to'] as $k => $label) {
+        if ($f[$k] !== '' && $date($f[$k]) === null) {
+            $f['error'] = "\"{$label}\" isn't a date. Pick one from the calendar.";
+        }
+    }
+    if ($f['error'] === '' && $f['from'] !== '' && $f['to'] !== '' && $f['from'] > $f['to']) {
+        $f['error'] = 'The "Activated from" date is after the "Activated to" date.';
+    }
+    return $f;
+}
+
+/** The filter as query parameters for links (pages, Clear), without defaults. */
+function admin_user_filter_query(array $f, array $override = []): array
+{
+    $f = $override + $f;
+    return array_filter([
+        'tab' => 'users', 'show' => $f['show'] ? '1' : '', 'q' => $f['q'], 'package' => $f['package'],
+        'from' => $f['from'], 'to' => $f['to'], 'per' => $f['per'] !== USERS_PER_PAGE ? (string) $f['per'] : '',
+        'sort' => $f['sort'] !== 'newest' ? $f['sort'] : '', 'page' => $f['page'] > 1 ? (string) $f['page'] : '',
+    ], fn ($v) => $v !== '');
+}
+
+/**
+ * One page of users for the filter (admin_user_filter()), with whether they have a card profile and
+ * their backoffice accounts, the number of users that match and the number of backoffice accounts
+ * those users have. The name filter also finds a user by email, user ID, or one of their accounts: its
+ * ID (MMM-88004), name (MMMC3) or username; such accounts come back with 'match' => true.
+ */
+function admin_search_users(array $f): array
+{
+    $search = $f['q'];
+    $conds = [];
     $params = [];
     if ($search !== '') {
         $like = '%' . addcslashes($search, '%_\\') . '%';
-        $where = 'WHERE (u.id = ? OR u.name LIKE ? OR u.email LIKE ?)';
-        $params = [$search, $like, $like];
+        $conds[] = '(u.id = ? OR u.name LIKE ? OR u.email LIKE ?
+                  OR EXISTS (SELECT 1 FROM mlm_accounts a WHERE a.user_id = u.id AND (a.id = ? OR a.account_name LIKE ? OR a.username LIKE ?)))';
+        array_push($params, $search, $like, $like, $search, $like, $like);
     }
-    $total = (int) db_value("SELECT COUNT(*) FROM users u $where", $params);
-    $offset = (max(1, $page) - 1) * USERS_PER_PAGE;
-    $order = (USER_SORTS[$sort] ?? USER_SORTS['newest'])[1];
+    if ($f['package'] !== '') {
+        $conds[] = 'p.tier = ?';
+        $params[] = USER_PACKAGES[$f['package']];
+    }
+    if ($f['from'] !== '') {
+        $conds[] = 'u.created_at >= ?';
+        $params[] = $f['from'] . ' 00:00:00';
+    }
+    if ($f['to'] !== '') {
+        $conds[] = 'u.created_at < ? + INTERVAL 1 DAY';
+        $params[] = $f['to'];
+    }
+    $where = $conds ? 'WHERE ' . implode(' AND ', $conds) : '';
+    $from = 'FROM users u LEFT JOIN member_profiles p ON p.user_id = u.id';
+    $total = (int) db_value("SELECT COUNT(*) $from $where", $params);
+    $accountTotal = (int) db_value("SELECT COUNT(*) $from JOIN mlm_accounts ma ON ma.user_id = u.id $where", $params);
+    $per = $f['per'];
+    $offset = (max(1, $f['page']) - 1) * $per;
+    $order = USER_SORTS[$f['sort']][1];
     $rows = db_all(
         "SELECT u.id, u.name, u.email, u.role, u.title, u.status, u.verified, u.joined_date, u.last_login_at, u.created_at,
-                (p.user_id IS NOT NULL) AS has_card
-         FROM users u LEFT JOIN member_profiles p ON p.user_id = u.id
-         $where ORDER BY $order LIMIT " . USERS_PER_PAGE . " OFFSET $offset",
+                (p.user_id IS NOT NULL) AS has_card, p.tier
+         $from $where ORDER BY $order LIMIT $per OFFSET $offset",
         $params
     );
-    return [$rows, $total];
+    $accounts = admin_users_accounts(array_column($rows, 'id'), $search);
+    foreach ($rows as &$row) {
+        $row['accounts'] = $accounts[$row['id']] ?? [];
+    }
+    unset($row);
+    return [$rows, $total, $accountTotal];
+}
+
+/** The backoffice accounts of these users (main account first), by user ID; 'match': the search found it. */
+function admin_users_accounts(array $userIds, string $search = ''): array
+{
+    if (!$userIds) {
+        return [];
+    }
+    $marks = implode(',', array_fill(0, count($userIds), '?'));
+    $out = [];
+    foreach (db_all("SELECT id, user_id, username, account_name, head_number, status, entry_date, available_balance, total_income, left_count, right_count
+                     FROM mlm_accounts WHERE user_id IN ($marks) ORDER BY head_number, id", array_values($userIds)) as $a) {
+        $a['match'] = $search !== '' && (strcasecmp($a['id'], $search) === 0
+            || mb_stripos((string) $a['account_name'], $search) !== false || mb_stripos((string) $a['username'], $search) !== false);
+        $out[$a['user_id']][] = $a;
+    }
+    return $out;
 }
 
 function admin_find_user(string $userId): ?array

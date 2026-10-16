@@ -78,7 +78,7 @@ $memLabel = 'block text-[11px] font-semibold text-zinc-300 mb-1';
                 <div>
                     <label for="mem-nfc-action" class="block text-[11px] font-bold text-zinc-300 mb-1">Physical Contactless Tap Behavior</label>
                     <select id="mem-nfc-action" name="nfcAction" class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white focus:outline-none focus:border-[#f3bd35]">
-                        <option value="card">Open Executive Digital Card Portal (1evoai.com/username)</option>
+                        <option value="card">Open Executive Digital Card Portal (their card link)</option>
                         <option value="vcard">Instant Direct Contact Download (.vcf address book)</option>
                         <option value="whatsapp">Launch Direct Encrypted WhatsApp VIP Chat</option>
                     </select>
@@ -128,8 +128,8 @@ $memLabel = 'block text-[11px] font-semibold text-zinc-300 mb-1';
                         <input id="mem-edit-company" name="company" type="text" required maxlength="255" class="<?= $memInput ?>">
                     </div>
                     <div>
-                        <label for="mem-edit-slug" class="<?= $memLabel ?>">Card Custom Slug</label>
-                        <input id="mem-edit-slug" name="customSlug" type="text" maxlength="255" class="<?= $memInput ?>">
+                        <label for="mem-edit-slug" class="<?= $memLabel ?>">Card Link Name (<?= e(preg_replace('#^https?://#', '', base_url())) ?>/…)</label>
+                        <input id="mem-edit-slug" name="customSlug" type="text" maxlength="60" placeholder="e.g. juan-dela-cruz" autocomplete="off" spellcheck="false" class="<?= $memInput ?>">
                     </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">

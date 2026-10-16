@@ -26,6 +26,8 @@ $dcInput = 'w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-
 $dcLabel = 'block text-[11px] font-semibold text-zinc-300 mb-1';
 $dcPreviewUrl = url('card', ['profile' => $user['id']]);
 $dcVcardUrl = base_path() . '/vcard.php?id=' . rawurlencode($user['id']);
+// The QR code opens the card on 1EVOAI (e.g. /juan-dela-cruz), not the member's own domain.
+$dcQrUrl = card_share_url($profile, false);
 $dcNfcAction = (string) ($profile['nfcAction'] ?? '') ?: 'card';
 
 // Real QR code for the share link (vendor/qrcode.js); the reference's static pattern is the fallback.
@@ -41,6 +43,7 @@ if (!in_array('assets/js/vendor/qrcode.js', $pageScripts, true)) {
     'services' => $dcServices,
     'previewUrl' => $dcPreviewUrl,
     'shareUrl' => $shareUrl,
+    'qrUrl' => $dcQrUrl,
     'qrFile' => preg_replace('/\s+/', '_', $dcName) . '_88MMM_QR.png',
 ]) ?></script>
 <?php /* Modals live outside the space-y-6 stack so they get no sibling margins (Tailwind v4 :not(:last-child)). */ ?>
@@ -195,15 +198,32 @@ if (!in_array('assets/js/vendor/qrcode.js', $pageScripts, true)) {
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label for="dc-slug" class="<?= $dcLabel ?>">Personal Card Slug URL</label>
-                            <input id="dc-slug" name="customSlug" type="text" maxlength="120" value="<?= e($profile['customSlug']) ?>" placeholder="1evoai.com/yourname" class="<?= $dcInput ?>">
+                            <label for="dc-slug" class="<?= $dcLabel ?>">Your Card Link</label>
+                            <input id="dc-slug" name="customSlug" type="text" maxlength="60" value="<?= e($profile['customSlug']) ?>" placeholder="e.g. juan-dela-cruz" autocomplete="off" spellcheck="false" aria-describedby="dc-slug-help" class="<?= $dcInput ?>">
+                            <?php $dcCardLink = card_share_url($profile, false); ?>
+                            <span id="dc-slug-help" class="block text-[10px] text-zinc-400 mt-1">Your card opens at <a href="<?= e($dcCardLink) ?>" target="_blank" rel="noopener" class="text-[#ffda72] hover:text-white break-all"><?= e(preg_replace('#^https?://#', '', $dcCardLink)) ?></a>. Letters, numbers and dashes; leave it empty to use your name. Changing it changes the link.</span>
                             <?php if (($dcDomain = domain_card_domain($user['id'])) !== null): ?>
                                 <span class="block text-[10px] text-emerald-300 mt-1">Your card is shared at <?= e($dcDomain) ?> (Your .com Domain, below). This link still works too.</span>
                             <?php endif; ?>
                         </div>
-                        <div>
-                            <label for="dc-avatar" class="<?= $dcLabel ?>">Avatar Photo Image URL</label>
-                            <input id="dc-avatar" name="avatar" type="text" maxlength="500" value="<?= e($dcAvatar) ?>" placeholder="https://... or portrait URL" class="<?= $dcInput ?>">
+                        <div data-dc-photo-box>
+                            <span class="<?= $dcLabel ?>">Profile Picture</span>
+                            <div class="flex items-center gap-3">
+                                <div class="w-14 h-14 rounded-full bg-zinc-900 border border-[#f3bd35]/40 overflow-hidden flex items-center justify-center text-[#ffda72] font-bold text-base shrink-0">
+                                    <img data-dc-photo src="<?= e(media_url($dcAvatar)) ?>" alt="Your profile picture" class="w-full h-full object-cover"<?= $dcAvatar === '' ? ' hidden' : '' ?>>
+                                    <span data-dc-photo-initial<?= $dcAvatar === '' ? '' : ' hidden' ?>><?= e(mb_strtoupper(mb_substr($dcName, 0, 1))) ?></span>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button type="button" data-dc-photo-pick class="px-3 py-1.5 rounded-lg bg-[#f3bd35] hover:bg-[#ffda72] text-black text-[11px] font-bold transition-colors disabled:opacity-50">Upload photo</button>
+                                    <button type="button" data-dc-photo-remove class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-[11px] font-semibold transition-colors disabled:opacity-50"<?= $dcAvatar === '' ? ' hidden' : '' ?>>Remove</button>
+                                    <input type="file" data-dc-photo-file accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Choose a profile picture" hidden>
+                                </div>
+                            </div>
+                            <span class="block text-[10px] text-zinc-500 mt-1">JPEG, PNG, WebP or GIF, up to 5 MB. It shows on your card straight away; a square photo of your face looks best.</span>
+                            <details class="mt-1.5">
+                                <summary class="text-[10px] text-zinc-400 hover:text-white cursor-pointer">Or use a picture's web address</summary>
+                                <input id="dc-avatar" name="avatar" type="text" maxlength="500" value="<?= e($dcAvatar) ?>" placeholder="https://..." aria-label="Profile picture web address" class="<?= $dcInput ?> mt-1.5">
+                            </details>
                         </div>
                     </div>
                     <div>
@@ -372,6 +392,84 @@ if (!in_array('assets/js/vendor/qrcode.js', $pageScripts, true)) {
                     </button>
                 </div>
             </form>
+
+            <?php
+            // Card Design (includes/cards.php, assets/js/views/bo-card-design.js): colours, font, cover photo, blocks.
+            $ddDesign = card_design($user['id']);
+            [$ddAccent] = card_design_colors($ddDesign);
+            $pageData['cardDesign'] = ['design' => $ddDesign];
+            ?>
+            <form id="dc-design-form" class="mt-6 p-5 rounded-3xl bg-[#111111] border border-[#f3bd35]/25 space-y-5" novalidate>
+                <div class="flex items-center justify-between gap-3 pb-2 border-b border-zinc-800">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-[#f3bd35] flex items-center gap-1.5"><?= icon('palette', 'w-4 h-4') ?> Card Design</h3>
+                    <a href="<?= e($dcQrUrl) ?>" target="_blank" rel="noopener" class="text-[11px] text-[#ffda72] hover:text-white flex items-center gap-1"><?= icon('external-link', 'w-3 h-3') ?><span>Open my card</span></a>
+                </div>
+                <p class="text-xs text-zinc-400">Make your 1EVOAI card your own: its colour, font and cover photo, and which parts show in what order.</p>
+
+                <div class="space-y-2">
+                    <span class="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Colour</span>
+                    <input type="hidden" name="theme" value="<?= e($ddDesign['theme']) ?>">
+                    <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Colour theme">
+                        <?php foreach (CARD_THEMES as $tid => [$tAccent, $tLight, $tName]): $tOn = $ddDesign['accent'] === '' && $ddDesign['theme'] === $tid; ?>
+                            <button type="button" data-dd-theme="<?= e($tid) ?>" role="radio" aria-checked="<?= $tOn ? 'true' : 'false' ?>" class="evo-swatch<?= $tOn ? ' is-on' : '' ?>">
+                                <span class="evo-swatch-dot" style="background: linear-gradient(135deg, <?= e($tLight) ?>, <?= e($tAccent) ?>)"></span>
+                                <span><?= e($tName) ?></span>
+                            </button>
+                        <?php endforeach; ?>
+                    </div>
+                    <label class="flex items-center gap-2 text-xs text-zinc-300">
+                        <input type="checkbox" data-dd-own<?= $ddDesign['accent'] !== '' ? ' checked' : '' ?> class="evo-check">
+                        <span>Use my own colour</span>
+                        <input type="color" name="accent" value="<?= e($ddDesign['accent'] !== '' ? $ddDesign['accent'] : $ddAccent) ?>" aria-label="My own colour" class="w-10 h-7 rounded-md bg-zinc-900 border border-zinc-700 cursor-pointer disabled:opacity-40"<?= $ddDesign['accent'] !== '' ? '' : ' disabled' ?>>
+                    </label>
+                    <span class="block text-[10px] text-zinc-500">A very dark colour is lightened a little so buttons stay readable.</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="dd-font" class="<?= $dcLabel ?>">Font</label>
+                        <select id="dd-font" name="font" class="<?= $dcInput ?>">
+                            <?php foreach (CARD_FONTS as $fid => $fName): ?>
+                                <option value="<?= e($fid) ?>"<?= $ddDesign['font'] === $fid ? ' selected' : '' ?>><?= e($fName) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div data-dd-cover-box>
+                        <span class="<?= $dcLabel ?>">Cover Photo</span>
+                        <div class="h-16 rounded-xl overflow-hidden bg-zinc-950 border border-zinc-800 flex items-center justify-center text-[10px] text-zinc-500">
+                            <img data-dd-cover src="<?= e(media_url($ddDesign['cover'])) ?>" alt="Your cover photo" class="w-full h-full object-cover"<?= $ddDesign['cover'] === '' ? ' hidden' : '' ?>>
+                            <span data-dd-nocover<?= $ddDesign['cover'] === '' ? '' : ' hidden' ?>>No cover photo</span>
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <button type="button" data-dd-cover-pick class="px-3 py-1.5 rounded-lg bg-[#f3bd35] hover:bg-[#ffda72] text-black text-[11px] font-bold transition-colors disabled:opacity-50">Upload cover</button>
+                            <button type="button" data-dd-cover-remove class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-[11px] font-semibold transition-colors disabled:opacity-50"<?= $ddDesign['cover'] === '' ? ' hidden' : '' ?>>Remove</button>
+                            <input type="file" data-dd-cover-file accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Choose a cover photo" hidden>
+                        </div>
+                        <span class="block text-[10px] text-zinc-500 mt-1">A wide photo (about 3:1) across the top of your card. Saved straight away.</span>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <span class="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Card Sections</span>
+                    <span class="block text-[10px] text-zinc-500">Tick what shows under your profile, and use the arrows to put it in your order.</span>
+                    <ol data-dd-blocks class="rounded-2xl border border-zinc-800 divide-y divide-zinc-800 overflow-hidden">
+                        <?php foreach ($ddDesign['blocks'] as $bi => $b): ?>
+                            <li data-dd-block="<?= e($b['id']) ?>" class="flex items-center justify-between gap-3 px-3 py-2 bg-zinc-950 text-xs">
+                                <label class="flex items-center gap-2 text-zinc-200 min-w-0">
+                                    <input type="checkbox" data-dd-show<?= $b['show'] ? ' checked' : '' ?> class="evo-check">
+                                    <span class="truncate"><?= e(CARD_BLOCKS[$b['id']]) ?></span>
+                                </label>
+                                <span class="flex items-center gap-1 shrink-0">
+                                    <button type="button" data-dd-up class="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white disabled:opacity-40" aria-label="Move up">↑</button>
+                                    <button type="button" data-dd-down class="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white disabled:opacity-40" aria-label="Move down">↓</button>
+                                </span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ol>
+                </div>
+
+                <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-extrabold text-xs rounded-xl shadow-lg hover:brightness-105 flex items-center justify-center gap-2 disabled:opacity-60"><?= icon('save', 'w-4 h-4') ?><span>Save Card Design</span></button>
+            </form>
         </div>
     </div>
 
@@ -394,7 +492,7 @@ if (!in_array('assets/js/vendor/qrcode.js', $pageScripts, true)) {
                 <p class="text-xs text-zinc-400 mt-1"><?= e($dcName) ?> · 88MMM Circle</p>
             </div>
             <div class="p-4 bg-white rounded-2xl mx-auto shadow-inner flex flex-col items-center justify-center my-4">
-                <svg id="public-qr-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-48 h-48" role="img" aria-label="QR code for <?= e($shareUrl) ?>">
+                <svg id="public-qr-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-48 h-48" role="img" aria-label="QR code for <?= e($dcQrUrl) ?>">
                     <rect width="200" height="200" fill="#ffffff"/>
                     <g data-qr-modules>
                         <rect x="15" y="15" width="45" height="45" rx="6" fill="#090909"/>
@@ -416,7 +514,7 @@ if (!in_array('assets/js/vendor/qrcode.js', $pageScripts, true)) {
                     <text x="100" y="105" font-size="11" font-weight="900" fill="#f3bd35" text-anchor="middle" font-family="sans-serif">88</text>
                 </svg>
             </div>
-            <p class="text-[11px] text-zinc-400 mb-5 break-all font-mono"><?= e($shareUrl) ?></p>
+            <p class="text-[11px] text-zinc-400 mb-5 break-all font-mono"><?= e($dcQrUrl) ?></p>
             <button type="button" data-qr-download class="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-bold text-xs rounded-xl shadow-lg hover:brightness-105 active:scale-95 transition-transform">
                 <?= icon('download', 'w-4 h-4') ?>
                 Download QR Image

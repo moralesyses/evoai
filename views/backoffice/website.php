@@ -1,10 +1,10 @@
 <?php
 /**
  * Backoffice tab 9 — My Website (includes/website.php,
- * assets/js/views/bo-website.js): once the member owns an active .com
- * domain, they build a one-page website from sections with a live preview,
- * and publish it to their domain. Without a domain the tab explains how to
- * get one.
+ * assets/js/views/bo-website.js): every member builds a one-page website
+ * from sections with a live preview and publishes it: at its portal
+ * address (linked from their card), and on their .com domain when they own
+ * one. Only an inactive account sees the tab locked.
  *
  * Uses: $user, $pageData.
  */
@@ -22,12 +22,11 @@ if ($wb['unlocked']) {
     <?php if (!$wb['unlocked']): ?>
         <div class="p-6 rounded-3xl bg-[#111111] border border-[#f3bd35]/25 text-center space-y-4 max-w-2xl mx-auto">
             <div class="w-14 h-14 rounded-full bg-[#f3bd35]/15 border border-[#f3bd35]/40 text-[#f3bd35] flex items-center justify-center mx-auto"><?= icon('monitor', 'w-7 h-7') ?></div>
-            <h2 class="text-xl font-black text-white">Build your own website</h2>
-            <p class="text-xs text-zinc-400 leading-relaxed">Your website builder comes with your own .com domain. Buy one in <strong class="text-zinc-200">Digital Card CMS → Your .com Domain</strong>, then come back here: pick a theme, add sections about you and your services, and publish it at yourname.com.</p>
-            <button type="button" data-tab="digital_card" data-group="bo" class="<?= $wbBtn ?> mx-auto bg-[#f3bd35] hover:bg-[#ffda72] text-black"><?= icon('globe', 'w-3.5 h-3.5') ?><span>Get my .com domain</span></button>
+            <h2 class="text-xl font-black text-white">Website builder unavailable</h2>
+            <p class="text-xs text-zinc-400 leading-relaxed">Active members build their own website here. This account isn't active, so its website is offline. Contact the 88MMM administrator.</p>
             <?php if ($wbCanDelete): ?>
                 <div class="pt-3 border-t border-zinc-800 flex flex-col items-center gap-2">
-                    <p class="text-[11px] text-zinc-500">Your saved website is kept, offline, until you have a domain again.</p>
+                    <p class="text-[11px] text-zinc-500">Your saved website is kept, offline.</p>
                     <?= $wbDelete ?>
                 </div>
             <?php endif; ?>
@@ -47,13 +46,21 @@ if ($wb['unlocked']) {
                     <span class="text-[11px] text-zinc-500" data-wb-saved role="status"></span>
                 </div>
                 <p class="text-xs text-zinc-400 mt-1">
-                    <?php if ($wb['published']): ?>
-                        Visitors of <?php if ($wb['liveUrl']): ?><a class="text-[#ffda72] hover:text-white break-all" href="<?= e($wb['liveUrl']) ?>" target="_blank" rel="noopener"><?= e($wb['liveUrl']) ?></a><?php else: ?>your domain<?php endif; ?> see this website<?= $wb['views'] ? ' (' . number_format($wb['views']) . ' visits)' : '' ?>; your card is at <span class="font-mono">?view=card</span>. Changes are saved as a draft until you publish again.
+                    <?php if ($wb['published'] && $wb['domain']): ?>
+                        Visitors of <a class="text-[#ffda72] hover:text-white break-all" href="<?= e($wb['publicUrl']) ?>" target="_blank" rel="noopener"><?= e($wb['publicUrl']) ?></a> see this website<?= $wb['views'] ? ' (' . number_format($wb['views']) . ' visits)' : '' ?>; your card is at <span class="font-mono">?view=card</span>. Changes are saved as a draft until you publish again.
+                    <?php elseif ($wb['published']): ?>
+                        Your website is live at <a class="text-[#ffda72] hover:text-white break-all" href="<?= e($wb['publicUrl']) ?>" target="_blank" rel="noopener"><?= e($wb['publicUrl']) ?></a><?= $wb['views'] ? ' (' . number_format($wb['views']) . ' visits)' : '' ?>, and your card's <strong class="text-zinc-200">Visit my website</strong> button opens it. Changes are saved as a draft until you publish again.
+                    <?php elseif ($wb['domain']): ?>
+                        Changes save automatically as a draft. Publish to show your website at <span class="text-zinc-200 break-all"><?= e($wb['publicUrl']) ?></span> instead of your digital card.
                     <?php else: ?>
-                        Changes save automatically as a draft. Publish to show your website at <?= $wb['liveUrl'] ? '<span class="text-zinc-200 break-all">' . e($wb['liveUrl']) . '</span>' : 'your domain' ?> instead of your digital card.
+                        Changes save automatically as a draft. Publish to put your website online; your card will get a <strong class="text-zinc-200">Visit my website</strong> button.
                     <?php endif; ?>
                 </p>
-                <p class="text-[10px] text-zinc-500 mt-1">On this computer it is also at <a class="text-zinc-400 hover:text-white break-all" href="<?= e($wb['portalUrl']) ?>" target="_blank" rel="noopener"><?= e($wb['portalUrl']) ?></a><?= $wb['published'] ? '' : ' once published' ?>.</p>
+                <?php if ($wb['domain']): ?>
+                    <p class="text-[10px] text-zinc-500 mt-1">It is also at <a class="text-zinc-400 hover:text-white break-all" href="<?= e($wb['portalUrl']) ?>" target="_blank" rel="noopener"><?= e($wb['portalUrl']) ?></a><?= $wb['published'] ? '' : ' once published' ?>.</p>
+                <?php else: ?>
+                    <p class="text-[10px] text-zinc-500 mt-1">Want yourname.com? <button type="button" data-tab="digital_card" data-group="bo" class="text-[#ffda72] hover:text-white underline underline-offset-2">Get a .com domain</button> and your website shows there too.</p>
+                <?php endif; ?>
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <a href="<?= e($wb['previewUrl']) ?>" target="_blank" rel="noopener" class="<?= $wbBtn ?> bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200"><?= icon('eye', 'w-3.5 h-3.5 text-[#f3bd35]') ?><span>Preview</span></a>
@@ -64,13 +71,20 @@ if ($wb['unlocked']) {
             </div>
         </div>
         <?php if ($wb['status'] === 'suspended'): ?>
-            <div class="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-200" role="alert">An administrator took your website offline<?= $wb['adminNote'] !== '' ? ': ' . e($wb['adminNote']) : '' ?>. Your domain shows your digital card. Contact the 88MMM administrator to restore it.</div>
+            <div class="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-200" role="alert">An administrator took your website offline<?= $wb['adminNote'] !== '' ? ': ' . e($wb['adminNote']) : '' ?>.<?= $wb['domain'] ? ' Your domain shows your digital card.' : '' ?> Contact the 88MMM administrator to restore it.</div>
         <?php elseif ($wb['changed']): ?>
             <div class="p-3 rounded-2xl bg-amber-950/40 border border-amber-600/40 text-xs text-amber-200" data-wb-changed>Your draft has changes that aren't live yet. Press <strong>Publish changes</strong> to show them.</div>
         <?php endif; ?>
 
         <div class="evo-wb">
             <div class="evo-wb-editor space-y-4">
+                <details class="evo-wb-panel" data-wb-designs-panel<?= $wb['fresh'] ? ' open' : '' ?>>
+                    <summary>Start from a design <span class="evo-wb-summary-note"><?= count($wb['designs']) ?> designs</span></summary>
+                    <div class="evo-wb-body">
+                        <p class="evo-wb-note">Pick a design to start from. It is filled in from your card profile, and you can change everything afterwards. It replaces your current draft; your published website stays as it is until you publish again.</p>
+                        <div class="evo-wb-designs" data-wb-designs></div>
+                    </div>
+                </details>
                 <details class="evo-wb-panel" open>
                     <summary>Site settings</summary>
                     <div class="evo-wb-body" data-wb-settings></div>

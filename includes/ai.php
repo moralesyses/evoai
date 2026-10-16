@@ -32,7 +32,7 @@ use Anthropic\Core\Exceptions\PermissionDeniedException;
 use Anthropic\Core\Exceptions\RateLimitException;
 
 /** Text that could not be written; the message is shown to the member. */
-final class AiError extends RuntimeException
+class AiError extends RuntimeException
 {
     /**
      * $kind: 'off' (no API key), 'limit' (today's limit is used up), 'retry'
@@ -44,6 +44,20 @@ final class AiError extends RuntimeException
         parent::__construct($message);
     }
 }
+
+/** The provider rejected its API key (wrong, revoked or expired). Still a 'fail' for the Contacts tab. */
+final class AiKeyError extends AiError
+{
+}
+
+/** Seconds the 88MMM Assistant skips a provider whose API key was just rejected (then it tries it again). */
+const AI_KEY_REJECTED_PAUSE = 600;
+
+/** The 88MMM Assistant's answer for Groq (Claude: AiChatReply in includes/ai_models.php), same fields. */
+const AI_CHAT_FIELDS = [
+    'onTopic' => ['type' => 'boolean', 'description' => 'true only when the message is about 88MMM Circle or this portal (see SCOPE); false for anything else'],
+    'reply' => ['type' => 'string', 'description' => 'The answer to show the person when onTopic is true; an empty string when onTopic is false'],
+];
 
 const AI_PROVIDERS = ['groq' => 'Groq', 'anthropic' => 'Claude'];
 const AI_DEFAULT_MODELS = ['groq' => 'openai/gpt-oss-120b', 'anthropic' => 'claude-opus-5-5'];
@@ -65,7 +79,7 @@ const AI_SHAPES = [
 ];
 
 const AI_SYSTEM_PROMPT = <<<'TXT'
-You help members of 88MMM Circle write emails to people in their personal contact list. 88MMM Circle is a membership network in the Philippines: members carry a 1EVOAI smart NFC business card with a digital card page, and they invite others to join (the Executive membership is ₱2,000).
+You help members of 88MMM Circle write emails to people in their personal contact list. 88MMM Circle is a membership community in the Philippines: members carry a 1EVOAI smart NFC business card with a digital card page, and they invite others to join (the Executive membership is ₱2,000).
 
 Write as the member, in the first person, to one contact. Keep each email short (under 170 words) and specific, with one clear next step for the reader. Plain text only: no markdown, no bullet symbols, and no emojis unless the tone calls for them.
 
@@ -248,7 +262,7 @@ function ai_groq_request(array $body): array
         $detail = is_array($json) ? (string) ($json['error']['message'] ?? '') : mb_substr((string) $raw, 0, 300);
         error_log("AI (Groq): HTTP {$status}: {$detail}");
         if ($status === 401 || $status === 403) {
-            throw new AiError('The AI service did not accept the API key. Ask the administrator to check ai.groq.api_key in config/config.php.');
+            throw new AiKeyError('The AI service did not accept the API key. Ask the administrator to check ai.groq.api_key in config/config.php.');
         }
         if ($status === 429) {
             // Groq's per-minute token limit (8,000 on the free tier) or daily request limit.
@@ -269,28 +283,93 @@ function ai_groq_request(array $body): array
     return $choice;
 }
 
-/**
- * A chat answer in plain text: $system instructions plus the conversation
- * ($messages: [['role' => 'user'|'assistant', 'content' => …], …], ending
- * with the user's question), from the chat provider (ai.chat_provider).
- * Rate limits are the caller's job (includes/assistant.php). Throws AiError.
- */
-function ai_chat(string $system, array $messages, int $maxTokens = 2048): string
+/** The 88MMM Assistant's providers in order: ai.chat_provider, then the other one as a fallback. */
+function ai_chat_providers(): array
 {
-    $provider = ai_provider('chat');
-    if (!ai_enabled($provider)) {
+    $first = ai_provider('chat');
+    return [$first, $first === 'groq' ? 'anthropic' : 'groq'];
+}
+
+/** Whether the 88MMM Assistant can answer: one of its providers has an API key (and curl or the SDK). */
+function ai_chat_enabled(): bool
+{
+    return (bool) array_filter(ai_chat_providers(), 'ai_enabled');
+}
+
+/**
+ * A chat answer: $system instructions plus the conversation ($messages:
+ * [['role' => 'user'|'assistant', 'content' => …], …], ending with the user's
+ * question). Returns ['onTopic' => bool, 'reply' => plain text]: the model says
+ * whether the question is in scope before it answers (AI_CHAT_FIELDS /
+ * AiChatReply), so the caller can refuse off-topic ones whatever the model wrote.
+ * Asked of the chat provider (ai.chat_provider);
+ * when it has no API key, rejects its key, is busy or unreachable, or returns an
+ * error, the other provider with a key answers instead. A rejected key is then
+ * skipped for AI_KEY_REJECTED_PAUSE seconds, so a revoked key doesn't slow every
+ * question down. A refusal is final. Rate limits are the caller's job
+ * (includes/assistant.php). Throws AiError.
+ */
+function ai_chat(string $system, array $messages, int $maxTokens = 2048): array
+{
+    $ready = array_values(array_filter(ai_chat_providers(), 'ai_enabled'));
+    if (!$ready) {
         throw new AiError('AI assistance is off.', 'off');
     }
+    $fresh = array_values(array_filter($ready, fn ($p) => !rate_limited('ai-key-rejected:' . $p, 1, AI_KEY_REJECTED_PAUSE)));
+    $order = $fresh ?: $ready;
+    foreach ($order as $i => $provider) {
+        $next = $order[$i + 1] ?? null;
+        try {
+            return ai_chat_with($provider, $system, $messages, $maxTokens);
+        } catch (AiKeyError $e) {
+            rate_limit_hit('ai-key-rejected:' . $provider, AI_KEY_REJECTED_PAUSE);
+            if ($next === null) {
+                throw $e;
+            }
+            error_log('AI chat: ' . AI_PROVIDERS[$provider] . ' rejected its API key; ' . AI_PROVIDERS[$next] . ' answers (and for the next ' . (AI_KEY_REJECTED_PAUSE / 60) . ' minutes).');
+        } catch (AiError $e) {
+            if ($next === null || $e->kind === 'refused') {
+                throw $e;
+            }
+            error_log('AI chat: ' . AI_PROVIDERS[$provider] . ' failed (' . $e->getMessage() . '); ' . AI_PROVIDERS[$next] . ' answers.');
+        }
+    }
+    throw new AiError('AI assistance is off.', 'off'); // not reached: the loop answers or throws
+}
+
+/**
+ * One chat answer from $provider (see ai_chat): ['onTopic' => bool, 'reply' => string].
+ * Throws AiKeyError when the key is rejected, AiError otherwise.
+ */
+function ai_chat_with(string $provider, string $system, array $messages, int $maxTokens): array
+{
     if ($provider === 'groq') {
-        $choice = ai_groq_request([
-            'model' => ai_model('groq'),
+        $model = ai_model('groq');
+        $body = [
+            'model' => $model,
             'messages' => array_merge([['role' => 'system', 'content' => $system]], $messages),
             'max_completion_tokens' => $maxTokens,
-        ]);
-        $text = trim((string) ($choice['message']['content'] ?? ''));
-        $cut = ($choice['finish_reason'] ?? '') === 'length';
+        ];
+        if (in_array($model, AI_GROQ_STRICT_MODELS, true)) {
+            $body['response_format'] = ['type' => 'json_schema', 'json_schema' => [
+                'name' => 'assistant_reply',
+                'strict' => true,
+                'schema' => ['type' => 'object', 'properties' => AI_CHAT_FIELDS, 'required' => array_keys(AI_CHAT_FIELDS), 'additionalProperties' => false],
+            ]];
+        } else {
+            // JSON mode: the fields are named in the instructions (they must mention JSON).
+            $body['response_format'] = ['type' => 'json_object'];
+            $body['messages'][0]['content'] .= "\n\nAnswer with a JSON object with these fields:\n"
+                . implode("\n", array_map(fn ($k, $f) => "{$k} ({$f['type']}): {$f['description']}", array_keys(AI_CHAT_FIELDS), AI_CHAT_FIELDS));
+        }
+        $choice = ai_groq_request($body);
+        if (($choice['finish_reason'] ?? '') === 'length') {
+            throw new AiError('The answer was too long. Try asking a shorter question.', 'retry');
+        }
+        $out = json_decode((string) ($choice['message']['content'] ?? ''), true);
     } else {
-        // Claude: adaptive thinking (the model's default), low effort for quick chat answers.
+        require_once APP_ROOT . '/includes/ai_models.php';
+        // Claude: adaptive thinking (the model's default), low effort for quick chat answers, structured output.
         try {
             $client = new Client(apiKey: ai_api_key('anthropic'), baseUrl: ai_base_url('anthropic') ?: null, requestOptions: ['timeout' => 60.0, 'maxRetries' => 1]);
             // fallbacks "default": if the model declines for policy reasons, the API retries on its default fallback model.
@@ -299,13 +378,13 @@ function ai_chat(string $system, array $messages, int $maxTokens = 2048): string
                 messages: $messages,
                 model: ai_model('anthropic'),
                 system: $system,
-                outputConfig: ['effort' => 'low'],
+                outputConfig: ['effort' => 'low', 'format' => AiChatReply::class],
                 fallbacks: 'default',
                 betas: ['server-side-fallback-2026-07-01'],
             );
         } catch (AuthenticationException|PermissionDeniedException $e) {
             error_log('AI (Claude) chat: API key rejected: ' . $e->getMessage());
-            throw new AiError('The AI service did not accept the API key (ai.anthropic.api_key).');
+            throw new AiKeyError('The AI service did not accept the API key (ai.anthropic.api_key).');
         } catch (RateLimitException $e) {
             $wait = (int) ceil((float) ($e->response?->getHeaderLine('retry-after') ?: 0));
             throw new AiError('The AI service is busy right now. Try again in a minute.', 'retry', $wait);
@@ -317,21 +396,20 @@ function ai_chat(string $system, array $messages, int $maxTokens = 2048): string
             throw new AiError('The AI service returned an error. Try again in a moment.');
         }
         if ($message->stopReason === 'refusal') {
-            throw new AiError('The AI declined to answer that.');
+            throw new AiError('The AI declined to answer that.', 'refused');
         }
-        $text = '';
-        foreach ($message->content as $block) {
-            if ($block->type === 'text') {
-                $text .= $block->text;
-            }
+        if ($message->stopReason === 'max_tokens') {
+            throw new AiError('The answer was too long. Try asking a shorter question.', 'retry');
         }
-        $text = trim($text);
-        $cut = $message->stopReason === 'max_tokens';
+        $parsed = $message->parsedOutput();
+        $out = $parsed instanceof AiChatReply ? get_object_vars($parsed) : null;
     }
-    if ($text === '') {
+    // A clear decision on the scope, and an answer when it is in scope.
+    if (!is_array($out) || !is_bool($out['onTopic'] ?? null) || !is_string($out['reply'] ?? null)
+        || ($out['onTopic'] && trim($out['reply']) === '')) {
         throw new AiError('The AI gave no answer. Try asking again.', 'retry');
     }
-    return $cut ? $text . ' …' : $text;
+    return ['onTopic' => $out['onTopic'], 'reply' => trim($out['reply'])];
 }
 
 /** Claude: one message through the Anthropic SDK with structured output. */
@@ -358,7 +436,7 @@ function ai_call_anthropic(string $prompt, string $shape): array
         );
     } catch (AuthenticationException|PermissionDeniedException $e) {
         error_log('AI (Claude): API key rejected: ' . $e->getMessage());
-        throw new AiError('The AI service did not accept the API key. Ask the administrator to check ai.anthropic.api_key in config/config.php.');
+        throw new AiKeyError('The AI service did not accept the API key. Ask the administrator to check ai.anthropic.api_key in config/config.php.');
     } catch (RateLimitException $e) {
         throw new AiError('The AI service is busy right now. Try again in a minute.', 'retry');
     } catch (APITimeoutException $e) {

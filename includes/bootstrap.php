@@ -66,6 +66,9 @@ require APP_ROOT . '/includes/domains.php';
 require APP_ROOT . '/includes/domain_valuation.php';
 require APP_ROOT . '/includes/website.php';
 require APP_ROOT . '/includes/encashments.php';
+require APP_ROOT . '/includes/products.php';
+require APP_ROOT . '/includes/cards.php';
+require APP_ROOT . '/includes/academy.php';
 foreach (glob(APP_ROOT . '/includes/ext/*.php') ?: [] as $extFile) {
     require $extFile;
 }

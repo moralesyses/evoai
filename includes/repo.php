@@ -196,7 +196,7 @@ function default_profile(string $userId): array
         'email' => $userId . '@mmmcircle.com', 'whatsapp' => '+639000000000', 'avatar' => null, 'location' => null,
         'quote' => null, 'headline' => null, 'subtitle' => null, 'services' => [], 'socials' => [],
         'nfcCardId' => 'MMC-EXE-' . rand_digits(5), 'tier' => 'Executive Member', 'membershipStatus' => 'Active',
-        'renewalDate' => 'Dec 2027', 'customSlug' => '1evoai.com/' . str_replace('usr_', '', $userId),
+        'renewalDate' => 'Dec 2027', 'customSlug' => '',
         'cardTheme' => 'gold', 'nfcAction' => 'card',
         'metrics' => ['views' => 120, 'taps' => 34, 'downloads' => 18, 'connectionsCount' => 9],
     ];
@@ -225,8 +225,71 @@ function find_profile_by_slug(string $slug): ?array
     if ($slug === '') {
         return null;
     }
-    $row = db_one('SELECT * FROM member_profiles WHERE LOWER(custom_slug) = ? OR LOWER(custom_slug) LIKE ? LIMIT 1', [$slug, '%/' . $slug]);
+    // The card link name (e.g. "mike"); older databases may still hold "1evoai.com/mike".
+    $row = db_one('SELECT * FROM member_profiles WHERE custom_slug = ? LIMIT 1', [$slug])
+        ?? db_one('SELECT * FROM member_profiles WHERE LOWER(custom_slug) LIKE ? LIMIT 1', ['%/' . $slug]);
     return $row ? profile_row_to_array($row) : null;
+}
+
+/* ---------------------------------------------------------------------
+ * Card link names: every card's address is <site>/<link name>, e.g.
+ * http://localhost/evoai/juan-dela-cruz (.htaccess sends it to
+ * index.php?card=…). Stored in member_profiles.custom_slug, unique.
+ * ------------------------------------------------------------------- */
+
+/** Names a card can't use: the site's own folders, files and pages. */
+const CARD_SLUG_RESERVED = [
+    'admin', 'api', 'app', 'assets', 'backoffice', 'bin', 'card', 'cards', 'chat', 'config', 'contact', 'database',
+    'domain', 'domains', 'help', 'home', 'includes', 'index', 'login', 'logout', 'mail', 'main', 'manifest', 'maya-webhook',
+    'member', 'members', 'pay', 'payment', 'portal', 'prod', 'public', 'register', 'robots', 'signin', 'signup', 'site',
+    'staging', 'storage', 'support', 'sw', 'unsubscribe', 'uploads', 'vcard', 'vendor', 'views', 'webhook', 'www',
+];
+
+/** A link name from free text: the part after the last "/", lowercase letters, digits and dashes. */
+function card_slug_clean(string $text): string
+{
+    $s = mb_strtolower(trim($text));
+    if (str_contains($s, '/')) {
+        $s = substr($s, strrpos($s, '/') + 1); // "1evoai.com/mike" -> "mike"
+    }
+    $s = strtr($s, ['á' => 'a', 'à' => 'a', 'â' => 'a', 'ä' => 'a', 'ã' => 'a', 'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+        'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i', 'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'ö' => 'o', 'õ' => 'o',
+        'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ñ' => 'n', 'ç' => 'c']);
+    $s = trim((string) preg_replace('/[^a-z0-9]+/', '-', $s), '-');
+    return trim(substr($s, 0, 60), '-');
+}
+
+/** Why $slug can't be $userId's card link name, or '' when it can. */
+function card_slug_problem(string $slug, ?string $userId = null): string
+{
+    if (!preg_match('/^[a-z][a-z0-9-]{2,59}$/', $slug)) {
+        return 'Your card link needs 3 to 60 letters, numbers or dashes, starting with a letter.';
+    }
+    if (in_array($slug, CARD_SLUG_RESERVED, true)) {
+        return '"' . $slug . '" is reserved for the portal. Please choose another card link.';
+    }
+    if (db_value('SELECT 1 FROM member_profiles WHERE custom_slug = ? AND user_id <> ?', [$slug, (string) $userId])) {
+        return '"' . $slug . '" is already another member\'s card link. Please choose another.';
+    }
+    return '';
+}
+
+/** A free link name made from $text (usually the member's name): "juan-dela-cruz", then "juan-dela-cruz-2", … */
+function card_slug_unique(string $text, ?string $userId = null): string
+{
+    $base = card_slug_clean($text);
+    if (!preg_match('/^[a-z]/', $base)) {
+        $base = trim('member-' . $base, '-');
+    }
+    if (strlen($base) < 3 || in_array($base, CARD_SLUG_RESERVED, true)) {
+        $base = $base . '-card';
+    }
+    for ($i = 1; ; $i++) {
+        $try = $i === 1 ? $base : trim(substr($base, 0, 55), '-') . '-' . $i;
+        if (card_slug_problem($try, $userId) === '') {
+            return $try;
+        }
+    }
 }
 
 const PROFILE_FIELD_MAP = [
@@ -295,9 +358,13 @@ function sanitize_profile_patch(array $patch): array
             case 'nfcAction':
                 $cols[$col] = in_array($value, ['card', 'vcard', 'whatsapp'], true) ? $value : 'card';
                 break;
+            case 'customSlug':
+                // Checked against the other members in write_member_profile().
+                $cols[$col] = card_slug_clean(is_scalar($value) ? (string) $value : '');
+                break;
             default:
                 $v = mb_substr(trim((string) (is_scalar($value) ? $value : '')), 0, 255);
-                $cols[$col] = ($v === '' && in_array($key, ['location', 'quote', 'headline', 'subtitle', 'customSlug', 'nfcCardId'], true)) ? null : $v;
+                $cols[$col] = ($v === '' && in_array($key, ['location', 'quote', 'headline', 'subtitle', 'nfcCardId'], true)) ? null : $v;
         }
     }
     return $cols;
@@ -319,6 +386,14 @@ function write_member_profile(string $userId, array $patch): void
     if (!$cols) {
         return;
     }
+    if (array_key_exists('custom_slug', $cols)) {
+        if ($cols['custom_slug'] === '') {
+            // Left empty: a link name from the member's name.
+            $cols['custom_slug'] = card_slug_unique((string) ($cols['name'] ?? db_value('SELECT name FROM member_profiles WHERE user_id = ?', [$userId])), $userId);
+        } elseif (($problem = card_slug_problem($cols['custom_slug'], $userId)) !== '') {
+            throw new InvalidArgumentException($problem);
+        }
+    }
     $sets = implode(', ', array_map(fn ($c) => "`$c` = ?", array_keys($cols)));
     db_run("UPDATE member_profiles SET $sets WHERE user_id = ?", [...array_values($cols), $userId]);
 }
@@ -326,6 +401,9 @@ function write_member_profile(string $userId, array $patch): void
 function create_member_profile(string $userId, array $data): void
 {
     $p = array_merge(default_profile($userId), $data);
+    // The card's link name: the one given if it is free, otherwise one from the name.
+    $slug = card_slug_clean((string) $p['customSlug']);
+    $p['customSlug'] = $slug !== '' && card_slug_problem($slug, $userId) === '' ? $slug : card_slug_unique((string) $p['name'], $userId);
     db_run(
         'INSERT INTO member_profiles (user_id, name, title, company, bio, phone, email, whatsapp, avatar, nfc_card_id, tier, membership_status, renewal_date, custom_slug, socials, views, taps, downloads, connections_count)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0)',
@@ -334,9 +412,46 @@ function create_member_profile(string $userId, array $data): void
     );
 }
 
+/** Profile photos members upload in Backoffice > Digital Card CMS. */
+const AVATAR_DIR = 'uploads/avatars';
+
+/** A member uploads their profile picture: it replaces the current one on their card at once. */
+function profile_avatar_upload(array $user, array $file): array
+{
+    $path = image_upload_store($file, AVATAR_DIR);
+    update_member_profile($user['id'], ['avatar' => $path]);
+    add_audit('Profile picture uploaded', $user['id']);
+    return ['avatar' => $path, 'url' => media_url($path)];
+}
+
+/** The member's card goes back to showing their initials. */
+function profile_avatar_remove(array $user): void
+{
+    update_member_profile($user['id'], ['avatar' => '']);
+    add_audit('Profile picture removed', $user['id']);
+}
+
+/** Delete an uploaded profile photo once no card, website or portal setting uses it. */
+function profile_avatar_delete_file(string $path): void
+{
+    if (!image_upload_is_ours($path, AVATAR_DIR)) {
+        return;
+    }
+    $like = '%' . $path . '%';
+    if (db_value('SELECT 1 FROM member_profiles WHERE avatar = ?', [$path])
+        || db_value('SELECT 1 FROM cms_settings WHERE setting_value LIKE ?', [$like])
+        || db_value('SELECT 1 FROM member_websites WHERE draft LIKE ? OR published LIKE ?', [$like, $like])) {
+        return;
+    }
+    if (is_file(APP_ROOT . '/' . $path)) {
+        @unlink(APP_ROOT . '/' . $path);
+    }
+}
+
 /** Update a member card; the master card also updates the portal CMS. */
 function update_member_profile(string $userId, array $patch): array
 {
+    $oldAvatar = array_key_exists('avatar', $patch) ? (string) db_value('SELECT avatar FROM member_profiles WHERE user_id = ?', [$userId]) : '';
     write_member_profile($userId, $patch);
     $profile = get_member_profile($userId);
     if ($userId === MASTER_PROFILE_ID) {
@@ -354,22 +469,28 @@ function update_member_profile(string $userId, array $patch): array
             }
         }
     }
+    // A replaced or removed uploaded photo is deleted once nothing uses it.
+    if ($oldAvatar !== '' && $oldAvatar !== (string) $profile['avatar']) {
+        profile_avatar_delete_file($oldAvatar);
+    }
     return $profile;
 }
 
 /**
  * Public share link for a card: the member's own .com domain when their card
- * uses one (domain_card_url), otherwise e.g. http://localhost/evoai/?card=mike.
- * $ownDomain = false: always the 1EVOAI link.
+ * uses one (domain_card_url), otherwise its address on this site, e.g.
+ * http://localhost/evoai/juan-dela-cruz. $ownDomain = false: always the
+ * address on this site.
  */
 function card_share_url(array $profile, bool $ownDomain = true): string
 {
     if ($ownDomain && ($url = domain_card_url((string) ($profile['userId'] ?? ''))) !== null) {
         return $url;
     }
-    $slug = (string) ($profile['customSlug'] ?? '');
-    $slug = $slug !== '' ? basename($slug) : str_replace('usr_', '', $profile['userId']);
-    return base_url() . '/?card=' . rawurlencode($slug);
+    $slug = card_slug_clean((string) ($profile['customSlug'] ?? ''));
+    return $slug !== ''
+        ? base_url() . '/' . $slug
+        : base_url() . '/index.php?' . http_build_query(['view' => 'card', 'profile' => (string) ($profile['userId'] ?? '')]);
 }
 
 /* =====================================================================

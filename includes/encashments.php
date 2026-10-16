@@ -115,7 +115,7 @@ function encash_lock_pending(string $id): array
 {
     $e = db_one('SELECT * FROM mlm_encashments WHERE id = ? FOR UPDATE', [$id]);
     if (!$e) {
-        throw new InvalidArgumentException('Encashment request not found.');
+        throw new InvalidArgumentException('Withdrawal request not found.');
     }
     if ($e['status'] !== 'pending') {
         throw new InvalidArgumentException($e['id'] . ' was already ' . $e['status'] . ($e['processed_at'] ? ' on ' . fmt_datetime($e['processed_at']) : '') . '.');
@@ -146,12 +146,12 @@ function encash_release(array $admin, string $id, string $payoutRef, string $not
         db_run('UPDATE mlm_transactions SET status = "completed", details = CONCAT(COALESCE(details, ""), ?)
                 WHERE account_id = ? AND type = "encashment" AND direction = "out" AND reference_number = ? AND status = "pending"',
             [' Released ' . date('M j, Y') . ', payout reference ' . $payoutRef . '.', $e['account_id'], $e['reference_number']]);
-        mlm_notify($e['account_id'], 'Encashment Released: ₱' . num($e['net_amount']) . ' PHP',
-            'Your encashment of ₱' . num($e['amount']) . ' was released: ₱' . num($e['net_amount']) . ' sent via ' . encash_method_label($e['payout_method'])
+        mlm_notify($e['account_id'], 'Withdrawal Released: ₱' . num($e['net_amount']) . ' PHP',
+            'Your withdrawal of ₱' . num($e['amount']) . ' was released: ₱' . num($e['net_amount']) . ' sent via ' . encash_method_label($e['payout_method'])
             . ' to ' . $e['account_details'] . '. Payout reference: ' . $payoutRef . '.', 'encashment');
         return $e;
     });
-    add_audit('Encashment ' . $e['id'] . ' released: ₱' . num($e['net_amount']) . ' net via ' . encash_method_label($e['payout_method']) . ' to ' . $e['account_details'] . ' (payout ref ' . $payoutRef . ')', $admin['id'], $e['account_id']);
+    add_audit('Withdrawal ' . $e['id'] . ' released:₱' . num($e['net_amount']) . ' net via ' . encash_method_label($e['payout_method']) . ' to ' . $e['account_details'] . ' (payout ref ' . $payoutRef . ')', $admin['id'], $e['account_id']);
     return db_one('SELECT * FROM mlm_encashments WHERE id = ?', [$e['id']]);
 }
 
@@ -175,13 +175,13 @@ function encash_reject(array $admin, string $id, string $reason): array
         db_run('UPDATE mlm_transactions SET status = "rejected", details = CONCAT(COALESCE(details, ""), ?)
                 WHERE account_id = ? AND type = "encashment" AND direction = "out" AND reference_number = ? AND status = "pending"',
             [' Rejected: ' . $reason, $e['account_id'], $e['reference_number']]);
-        mlm_add_tx($e['account_id'], 'encashment', 'Encashment Rejected: Refund', (float) $e['amount'], 'in', 'completed', $e['reference_number'] . '-R',
+        mlm_add_tx($e['account_id'], 'encashment', 'Withdrawal Rejected: Refund', (float) $e['amount'], 'in', 'completed', $e['reference_number'] . '-R',
             'Returned to available balance. Reason: ' . $reason);
-        mlm_notify($e['account_id'], 'Encashment Rejected: ₱' . num($e['amount']) . ' returned',
-            'Your encashment request for ₱' . num($e['amount']) . ' was not released: ' . $reason . ' The full ₱' . num($e['amount']) . ' is back in your available balance.', 'encashment');
+        mlm_notify($e['account_id'], 'Withdrawal Rejected: ₱' . num($e['amount']) . ' returned',
+            'Your withdrawal request for ₱' . num($e['amount']) . ' was not released: ' . $reason . ' The full ₱' . num($e['amount']) . ' is back in your available balance.', 'encashment');
         return $e;
     });
-    add_audit('Encashment ' . $e['id'] . ' rejected, ₱' . num($e['amount']) . ' returned to the balance: ' . $reason, $admin['id'], $e['account_id']);
+    add_audit('Withdrawal ' . $e['id'] . ' rejected,₱' . num($e['amount']) . ' returned to the balance: ' . $reason, $admin['id'], $e['account_id']);
     return db_one('SELECT * FROM mlm_encashments WHERE id = ?', [$e['id']]);
 }
 
@@ -190,7 +190,7 @@ function encash_bulk_ids(array $ids): array
 {
     $ids = array_values(array_unique(array_filter(array_map(static fn ($i) => is_string($i) ? trim($i) : '', $ids), static fn ($i) => $i !== '' && strlen($i) <= 40)));
     if (!$ids) {
-        throw new InvalidArgumentException('Select at least one encashment request.');
+        throw new InvalidArgumentException('Select at least one withdrawal request.');
     }
     if (count($ids) > ENCASH_MAX_BULK) {
         throw new InvalidArgumentException('Select at most ' . ENCASH_MAX_BULK . ' requests at a time (one page).');
@@ -208,7 +208,7 @@ function encash_bulk_result(array $admin, string $verb, array $done, array $skip
         throw new InvalidArgumentException(implode(' ', $skipped) ?: 'Nothing was processed.');
     }
     $amount = array_sum(array_map(static fn ($e) => (float) $e[$field], $done));
-    add_audit('Bulk ' . $verb . ' ' . count($done) . ' encashment request' . (count($done) === 1 ? '' : 's') . ' (₱' . num($amount) . ($field === 'net_amount' ? ' net' : '') . '): ' . implode(', ', array_column($done, 'id')), $admin['id']);
+    add_audit('Bulk ' . $verb . ' ' . count($done) . ' withdrawal request' . (count($done) === 1 ? '' : 's') . ' (₱' . num($amount) . ($field === 'net_amount' ? ' net' : '') . '): ' . implode(', ', array_column($done, 'id')), $admin['id']);
     return ['done' => count($done), 'amount' => $amount, 'skipped' => $skipped];
 }
 
@@ -277,14 +277,14 @@ function encash_export(array $admin, array $f, array $ids = []): array
     }
     $n = (int) db_value("SELECT COUNT(*) $sql", $params);
     if ($n === 0) {
-        throw new InvalidArgumentException($ids ? 'The selected requests no longer exist.' : 'No encashment requests match these filters.');
+        throw new InvalidArgumentException($ids ? 'The selected requests no longer exist.' : 'No withdrawal requests match these filters.');
     }
     if ($n > ENCASH_MAX_EXPORT) {
         throw new InvalidArgumentException('That is ' . number_format($n) . ' requests. Download at most ' . number_format(ENCASH_MAX_EXPORT) . ' at a time: narrow the filters.');
     }
     $rows = db_all('SELECT ' . ENCASH_COLUMNS . " $sql ORDER BY e.requested_at, e.id", $params);
     $money = static fn ($v) => number_format((float) $v, 2, '.', '');
-    $lines = [csv_line(['Request ID', 'Reference', 'Requested', 'Head ID', 'Account Name', 'Username', 'Member', 'Member Email', 'Payout Channel', 'Account Details',
+    $lines = [csv_line(['Request ID', 'Reference', 'Requested', 'Account ID', 'Account Name', 'Username', 'Member', 'Member Email', 'Payout Channel', 'Account Details',
         'Gross', 'Tax', 'Fee', 'Net Payout', 'Status', 'Processed', 'Processed By', 'Payout Reference', 'Note / Reason'])];
     foreach ($rows as $r) {
         $lines[] = csv_line([
@@ -294,7 +294,7 @@ function encash_export(array $admin, array $f, array $ids = []): array
             ENCASH_STATUSES[$r['status']] ?? $r['status'], (string) $r['processed_at'], (string) $r['processed_by_name'], $r['payout_reference'], $r['admin_note'],
         ]);
     }
-    add_audit('Downloaded ' . $n . ($ids ? ' selected' : '') . ' encashment request' . ($n === 1 ? '' : 's') . ' as CSV', $admin['id']);
+    add_audit('Downloaded ' . $n . ($ids ? ' selected' : '') . ' withdrawal request' . ($n === 1 ? '' : 's') . ' as CSV', $admin['id']);
     $label = $ids ? 'selected-' : ($f['status'] !== '' ? $f['status'] . '-' : '');
     return ['csv' => implode("\r\n", $lines) . "\r\n", 'count' => $n, 'filename' => 'encashments-' . $label . date('Y-m-d') . '.csv'];
 }

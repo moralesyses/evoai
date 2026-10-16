@@ -24,8 +24,8 @@ return [
         // Public base URL used for share links / QR codes / vCards.
         // Leave empty to detect it from the current request.
         'base_url' => '',
-        // Demo mode reproduces the reference portal's demo conveniences:
-        // one-click demo sign-in buttons, the header account switcher and
+        // Demo mode adds the reference portal's demo conveniences: the header
+        // account switcher (any signed-in user can switch to any account) and
         // on-screen one-time recovery passes. Set to false in production.
         'demo_mode' => true,
         // Show PHP errors in the browser (development only).
@@ -34,7 +34,7 @@ return [
 
     // 1EVOAI Card (digital vCard) settings.
     'card' => [
-        // WeServe member cards (?card=<id>-<code>) from the UserProfile and
+        // WeServe member cards (/<id>-<code>) from the UserProfile and
         // NetworkAccount tables (database/weserve_members.sql). The code in each
         // link is signed with this secret; leave empty to turn member cards off.
         // Use the same value as LINK_SECRET in the WeServe vCard app

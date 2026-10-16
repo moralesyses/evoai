@@ -16,7 +16,7 @@ return [
     'company' => 'Maranan Group of Companies',
     'bio' => 'Mike Maranan is a Filipino entrepreneur and business leader who combines enterprise, education, mentorship, and social impact—creating businesses and communities designed to help people connect, grow, and create a lasting legacy.',
     'avatarUrl' => 'assets/images/mike_maranan_avatar.png',
-    'location' => 'Bonifacio Global City, Taguig, Philippines',
+    'location' => '6th floor Frabelle Alabang Building, Madrigal Business Park, Ayala Alabang, Muntinlupa City, Metro Manila',
     'phone' => '+63 917 888 6272',
     'email' => 'hello@mmmcircle.com',
     'whatsapp' => '+639178886272',

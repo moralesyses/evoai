@@ -152,6 +152,17 @@
 .evo-wb-thumb { width: 64px; height: 48px; border-radius: 8px; background: #18181b center / cover no-repeat; border: 1px solid #3f3f46; }
 .evo-wb-image-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .evo-wb-add { display: flex; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid #27272a; }
+/* "Start from a design" (views/backoffice/website.php) */
+.evo-wb-summary-note { font-size: 10px; font-weight: 600; letter-spacing: 0; text-transform: none; color: #71717a; }
+.evo-wb-note { margin: 0; font-size: 11px; line-height: 1.5; color: #a1a1aa; }
+.evo-wb-designs { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.evo-wb-design { display: grid; gap: 6px; align-content: start; padding: 10px; border-radius: 14px; border: 1px solid #3f3f46; background: #18181b; }
+.evo-wb-design:hover { border-color: rgba(243, 189, 53, .5); }
+.evo-wb-design strong { font-size: 12px; color: #fff; }
+.evo-wb-design small { font-size: 11px; line-height: 1.45; color: #a1a1aa; }
+.evo-wb-design .evo-wb-design-meta { font-size: 10px; color: #71717a; }
+.evo-wb-design-swatch { height: 26px; }
+.evo-wb-design .evo-wb-small { margin-top: 2px; }
 .evo-wb-add select { flex: 1; }
 .evo-wb-preview { position: sticky; top: 84px; background: #111111; border: 1px solid rgba(243, 189, 53, .2); border-radius: 22px; overflow: hidden; }
 .evo-wb-preview-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; font-size: 11px; font-weight: 700; color: #a1a1aa; border-bottom: 1px solid #27272a; text-transform: uppercase; letter-spacing: .06em; }
@@ -166,3 +177,107 @@
     .evo-wb-preview { position: static; }
     .evo-wb-frame-wrap { height: 60vh; }
 }
+
+/* File pickers and checkboxes in the portal's colours (e.g. Admin > Shop Products). */
+.evo-file::file-selector-button {
+  margin-right: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: #27272a;
+  color: #e4e4e7;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.evo-file::file-selector-button:hover {
+  background: #3f3f46;
+}
+.evo-check {
+  accent-color: #f3bd35;
+}
+
+/* Utilities the compiled stylesheet lacks (member products on the card). */
+.aspect-square { aspect-ratio: 1 / 1; }
+.mt-auto { margin-top: auto; }
+.line-clamp-3 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+
+/* A spam trap people never see (the card's buy form). */
+.evo-hp { position: absolute !important; left: -9999px !important; width: 1px; height: 1px; opacity: 0; }
+
+/* Card Design (Backoffice > Digital Card CMS): colour swatches. */
+.evo-swatch { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.7rem 0.35rem 0.4rem; border-radius: 999px; border: 1px solid #3f3f46; background: #18181b; color: #d4d4d8; font-size: 11px; font-weight: 600; cursor: pointer; }
+.evo-swatch:hover { border-color: #71717a; color: #fff; }
+.evo-swatch.is-on { border-color: #f3bd35; color: #fff; box-shadow: 0 0 0 1px #f3bd35; }
+.evo-swatch-dot { width: 1.1rem; height: 1.1rem; border-radius: 999px; flex-shrink: 0; }
+
+/* A member's card: font, cover photo (views/card.php). */
+.evo-card[data-font="serif"] { font-family: Georgia, Cambria, "Times New Roman", serif; }
+.evo-card[data-font="rounded"] { font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif; }
+.evo-card-cover { position: relative; margin: -1.5rem -1.5rem 0; height: 9rem; overflow: hidden; }
+.evo-card-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.evo-card-cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 35%, #141414 100%); }
+.evo-card-avatar { margin-top: -4rem; z-index: 1; }
+
+/* Genealogy tree (views/backoffice/network.php): a canvas members drag around with the mouse.
+   The dotted background scrolls with the tree, so moving it is easy to see. */
+.evo-net-canvas { height: clamp(460px, 70vh, 860px); overflow: auto; cursor: grab; user-select: none; -webkit-user-select: none; background-color: #0a0a0a; background-image: radial-gradient(rgba(243, 189, 53, 0.12) 1px, transparent 1px); background-size: 22px 22px; background-attachment: local; }
+.evo-net-canvas:focus-visible { outline: 2px solid #f3bd35; outline-offset: -2px; }
+.evo-net-canvas.is-dragging, .evo-net-canvas.is-dragging * { cursor: grabbing !important; }
+
+/* "Switch Active Account" lists (views/backoffice.php, views/layout.php): the list scrolls under its
+   heading, with a scrollbar that is easy to see; app.js opens it at the current account. */
+.evo-switch-list { position: relative; max-height: min(18rem, 55vh); overflow-y: auto; overscroll-behavior: contain; padding-right: 0.25rem; scrollbar-width: thin; scrollbar-color: #f3bd35 #27272a; }
+.evo-switch-list::-webkit-scrollbar { width: 8px; }
+.evo-switch-list::-webkit-scrollbar-track { background: #27272a; border-radius: 999px; }
+.evo-switch-list::-webkit-scrollbar-thumb { background: #f3bd35; border-radius: 999px; border: 2px solid #27272a; }
+.evo-switch-list::-webkit-scrollbar-thumb:hover { background: #ffda72; }
+/* The backoffice's Active Account menu opens under the button on phones (the button sits on the left
+   there; right-aligned, the menu ran off the screen) and right-aligned beside it from md up. */
+.evo-acc-menu { left: 0; right: auto; }
+@media (min-width: 768px) { .evo-acc-menu { left: auto; right: 0; } }
+/* Mentor Academy (views/backoffice/academy.php, views/admin/academy.php) */
+.evo-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; border-radius: 999px; border: 1px solid #3f3f46; background: #18181b; color: #d4d4d8; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: border-color 0.15s, color 0.15s, background-color 0.15s; }
+.evo-chip:hover { border-color: #71717a; color: #fff; }
+.evo-chip.is-on { background: #f3bd35; border-color: #f3bd35; color: #000; }
+.evo-chip-count { font-size: 10px; opacity: 0.7; }
+.evo-ac-bar { height: 6px; border-radius: 999px; background: #27272a; overflow: hidden; }
+.evo-ac-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ffda72, #f3bd35); transition: width 0.4s; }
+.evo-ac-frame { display: block; width: 100%; height: min(60vh, 720px); border: 0; border-radius: 1rem; background: #0a0a0a; }
+.evo-ac-media { display: block; width: 100%; max-height: 60vh; border-radius: 1rem; background: #000; object-fit: contain; }
+.evo-ac-article { font-size: 0.875rem; line-height: 1.7; color: #e4e4e7; }
+.evo-ac-article p { margin: 0 0 0.9em; }
+.evo-ac-article ul { list-style: disc; padding-left: 1.25rem; margin: 0 0 0.9em; }
+.evo-ac-article li { margin: 0.25em 0; }
+
+/* card-theme:start — generated from views/card.php and views/partials/card_modals.php:
+   a member's card colour (Card Design) replaces the gold. Regenerate after changing their gold classes. */
+.evo-card[data-themed] .bg-\[\#f3bd35\] { background-color: var(--ca); }
+.evo-card[data-themed] .bg-\[\#f3bd35\]\/10 { background-color: color-mix(in oklab, var(--ca) 10%, transparent); }
+.evo-card[data-themed] .bg-\[\#f3bd35\]\/15 { background-color: color-mix(in oklab, var(--ca) 15%, transparent); }
+.evo-card[data-themed] .bg-\[\#f3bd35\]\/20 { background-color: color-mix(in oklab, var(--ca) 20%, transparent); }
+.evo-card[data-themed] .border-\[\#f3bd35\] { border-color: var(--ca); }
+.evo-card[data-themed] .border-\[\#f3bd35\]\/15 { border-color: color-mix(in oklab, var(--ca) 15%, transparent); }
+.evo-card[data-themed] .border-\[\#f3bd35\]\/20 { border-color: color-mix(in oklab, var(--ca) 20%, transparent); }
+.evo-card[data-themed] .border-\[\#f3bd35\]\/25 { border-color: color-mix(in oklab, var(--ca) 25%, transparent); }
+.evo-card[data-themed] .border-\[\#f3bd35\]\/30 { border-color: color-mix(in oklab, var(--ca) 30%, transparent); }
+.evo-card[data-themed] .border-\[\#f3bd35\]\/40 { border-color: color-mix(in oklab, var(--ca) 40%, transparent); }
+.evo-card[data-themed] .focus\:border-\[\#f3bd35\]:focus { border-color: var(--ca); }
+.evo-card[data-themed] .from-\[\#ffda72\] { --tw-gradient-from: var(--cl); }
+.evo-card[data-themed] .from-\[\#ffda72\]\/20 { --tw-gradient-from: color-mix(in oklab, var(--cl) 20%, transparent); }
+.evo-card[data-themed] .hover\:bg-\[\#f3bd35\]:hover { background-color: var(--ca); }
+.evo-card[data-themed] .hover\:bg-\[\#f3bd35\]\/10:hover { background-color: color-mix(in oklab, var(--ca) 10%, transparent); }
+.evo-card[data-themed] .hover\:bg-\[\#f3bd35\]\/20:hover { background-color: color-mix(in oklab, var(--ca) 20%, transparent); }
+.evo-card[data-themed] .hover\:bg-\[\#f3bd35\]\/30:hover { background-color: color-mix(in oklab, var(--ca) 30%, transparent); }
+.evo-card[data-themed] .hover\:bg-\[\#ffda72\]:hover { background-color: var(--cl); }
+.evo-card[data-themed] .hover\:border-\[\#f3bd35\]:hover { border-color: var(--ca); }
+.evo-card[data-themed] .hover\:border-\[\#f3bd35\]\/40:hover { border-color: color-mix(in oklab, var(--ca) 40%, transparent); }
+.evo-card[data-themed] .hover\:text-\[\#f3bd35\]:hover { color: var(--ca); }
+.evo-card[data-themed] .text-\[\#f3bd35\] { color: var(--ca); }
+.evo-card[data-themed] .text-\[\#ffda72\] { color: var(--cl); }
+.evo-card[data-themed] .to-\[\#8f6510\] { --tw-gradient-to: color-mix(in srgb, var(--ca) 55%, black); }
+.evo-card[data-themed] .to-\[\#996f13\] { --tw-gradient-to: color-mix(in srgb, var(--ca) 60%, black); }
+.evo-card[data-themed] .to-\[\#f3bd35\] { --tw-gradient-to: var(--ca); }
+.evo-card[data-themed] .to-\[\#f3bd35\]\/20 { --tw-gradient-to: color-mix(in oklab, var(--ca) 20%, transparent); }
+.evo-card[data-themed] .via-\[\#f3bd35\] { --tw-gradient-via: var(--ca); }
+/* card-theme:end */

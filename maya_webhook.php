@@ -1,7 +1,7 @@
 <?php
 /**
  * Maya webhook receiver for every Maya Checkout payment on this site:
- * memberships and Member Shop orders (maya_checkouts, MAYA-… references) and .com domain orders
+ * memberships, Member Shop orders and card orders (maya_checkouts, MAYA-… references) and .com domain orders
  * (domain_orders, DOM-… references). Register
  * https://<your-domain>/maya_webhook.php in Maya Business Manager for
  * PAYMENT_SUCCESS, PAYMENT_FAILED, PAYMENT_EXPIRED and PAYMENT_CANCELLED

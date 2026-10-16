@@ -3,3 +3,11 @@ config/config.php
 database/weserve_members.sql
 .env
 uploads/sites/
+uploads/products/
+uploads/avatars/
+uploads/covers/
+uploads/card-products/
+uploads/academy/
+storage/academy/
+# The owner's go-live guide names the hosting account's database and user: kept out of the public repository
+LAUNCH-HOSTINGER.md

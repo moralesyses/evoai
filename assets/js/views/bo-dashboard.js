@@ -9,24 +9,6 @@
   var form = document.getElementById('bo-encash-form');
   var modal = document.querySelector('[data-modal="bo-encash"]');
 
-  /* ---------------- Simulate pair (demo complan tool) ---------------- */
-  function simulatePair(btn) {
-    var restore = EVO.busy(btn);
-    EVO.api('mlm.simulatePair')
-      .then(function (res) {
-        if (res.success) {
-          EVO.reload(res.message);
-        } else {
-          restore();
-          EVO.toast(res.message, 'error');
-        }
-      })
-      .catch(function (e) {
-        restore();
-        EVO.toast(e.message, 'error');
-      });
-  }
-
   /* ---------------- Notifications ---------------- */
   function markRead(item) {
     if (item.getAttribute('data-read') === '1') return;
@@ -121,7 +103,7 @@
         updateSummary();
       })
       .catch(function (e) {
-        showError(e.message || 'Encashment submission failed.');
+        showError(e.message || 'Withdrawal submission failed.');
         busy = false;
         updateSummary();
       });
@@ -130,11 +112,6 @@
   /* ---------------- Delegated clicks ---------------- */
   root.addEventListener('click', function (ev) {
     var t = ev.target;
-    var sim = t.closest('[data-bo-simulate-pair]');
-    if (sim) {
-      simulatePair(sim);
-      return;
-    }
     if (t.closest('[data-bo-view-ledger]')) {
       EVO.activateTab('bo', 'transactions');
       return;

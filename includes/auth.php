@@ -256,9 +256,10 @@ function registration_request(array $in): array
     if (db_value('SELECT 1 FROM users WHERE email = ?', [$email])) {
         throw new InvalidArgumentException('An account with this email already exists. Please sign in.');
     }
-    $sponsorId = $sponsorId === '' ? 'MMM-88001' : $sponsorId;
+    // Left empty: the owner of the card this browser came from (signup_remembered_referrer), else MMM-88001.
+    $sponsorId = $sponsorId === '' ? (signup_remembered_referrer() ?: 'MMM-88001') : $sponsorId;
     if (!db_value('SELECT 1 FROM mlm_genealogy WHERE id = ?', [$sponsorId])) {
-        throw new InvalidArgumentException('Sponsor / Referral ID not found. Please check the ID or leave the default MMM-88001.');
+        throw new InvalidArgumentException('Referrer ID not found. Please check the ID or leave the default MMM-88001.');
     }
     return [
         'name' => $name,
@@ -288,7 +289,6 @@ function create_registered_account(array $reg): string
         'INSERT INTO users (id, name, email, password_hash, role, title, status, verified, joined_date) VALUES (?, ?, ?, ?, ?, ?, "active", 1, ?)',
         [$id, $reg['name'], $reg['email'], $reg['passwordHash'], $role, $title, date('M Y')]
     );
-    $slug = preg_replace('/[^a-z0-9]/', '', strtolower(explode(' ', $reg['name'])[0])) ?: 'member';
     create_member_profile($id, [
         'name'      => $reg['name'],
         'title'     => $title,
@@ -296,7 +296,7 @@ function create_registered_account(array $reg): string
         'email'     => $reg['email'],
         'tier'      => $vip ? "Chairman's Circle" : 'Executive Member',
         'nfcCardId' => ($vip ? 'MMC-VIP-' : 'MMC-EXE-') . rand_digits(5),
-        'customSlug' => '1evoai.com/' . $slug,
+        // No customSlug: the card's link name comes from the full name (juan-dela-cruz).
     ]);
     mlm_provision_account($id, $reg['name'], $reg['email'], $sponsor['id'], $sponsor['full_name']);
     add_audit('Executive account registered (' . ROLE_LABELS[$role] . ')', $id);

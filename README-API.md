@@ -463,6 +463,7 @@ Domain payments appear in **Online Payments & Ledger** as `domain_registration` 
 | Order stuck in `paid_failed_registration` | The error on the order: `funds:` means top up; `taken:` means refund; `config:` means check `.env` |
 | Domain active but not opening the card | Members' domains → DNS column. Check `SERVER_IP`, that the domain uses ResellerClub's name servers, and that the web server answers for that host name. DNS changes can take a few hours |
 | Maya payment made but the order is still pending | **Re-check payment**, or run the daily job. Locally, webhooks can't arrive |
-| "Online payment isn't available right now" | Maya keys, `MAYA_ENV`, or Maya unreachable; Apache's error log has the cause |
+| "Online checkout is still unavailable" | No Maya keys (`maya.public_key` / `secret_key` or `MAYA_PUBLIC_KEY` / `MAYA_SECRET_KEY`): add them to turn Maya on |
+| "Online payment isn't available right now" | Maya refused or couldn't be reached (wrong keys, `MAYA_ENV`, transaction limit); Apache's error log has the cause |
 | Price shows `DOMAIN_RETAIL_PRICE` instead of the market price | Porkbun or the exchange-rate sites unreachable from the server: see the warning in the admin tab, then press **Refresh** |
 | "We couldn't confirm that … is still free" | The .com registry (RDAP) didn't answer in time. Try again in a minute; Apache's error log has a `[domains] RDAP` line |

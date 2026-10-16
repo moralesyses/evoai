@@ -3,7 +3,8 @@
  * Maya Checkout (hosted payment page), https://developers.maya.ph.
  *
  * Maya is the only way to pay online on this site: memberships, renewals and
- * invoices (checkout modal), sign-ups, Member Shop orders and .com domains
+ * invoices (checkout modal), sign-ups, Member Shop orders, products on
+ * members' cards (includes/cards.php) and .com domains
  * (includes/payment_clients.php).
  *
  * 1. payments.mayaStart (or mlm.checkout for a shop order) stores the attempt
@@ -37,6 +38,12 @@ function maya_environment(): string
 }
 
 /** Whether Maya Checkout is configured (both API keys set). */
+/**
+ * What visitors and members see wherever Maya would be offered while it isn't set up (no keys yet,
+ * as on the live site until the owner adds them). One wording everywhere; add the punctuation where used.
+ */
+const MAYA_UNAVAILABLE = 'Online checkout is still unavailable';
+
 function maya_enabled(): bool
 {
     return (string) config('maya.public_key', '') !== '' && (string) config('maya.secret_key', '') !== '';
@@ -102,15 +109,16 @@ function maya_throttle(): void
 }
 
 /**
- * Start a Maya checkout for a checkout_request(), or for a Member Shop order
+ * Start a Maya checkout for a checkout_request(), for a Member Shop order
  * ($orderId: an mlm_orders row awaiting payment; the customer comes back to
- * the backoffice shop). Returns ['rrn' => the attempt's reference,
- * 'redirectUrl' => Maya's payment page].
+ * the backoffice shop), or for a product on a member's card ($cardOrderId: a
+ * card_orders row; the buyer comes back to that card). Returns ['rrn' => the
+ * attempt's reference, 'redirectUrl' => Maya's payment page].
  */
-function maya_start_checkout(array $req, ?array $user, ?string $orderId = null): array
+function maya_start_checkout(array $req, ?array $user, ?string $orderId = null, ?string $cardOrderId = null): array
 {
     if (!maya_enabled()) {
-        throw new InvalidArgumentException('Maya Checkout is not set up yet.');
+        throw new InvalidArgumentException(MAYA_UNAVAILABLE . '. Nothing was charged.');
     }
     maya_throttle();
 
@@ -118,11 +126,11 @@ function maya_start_checkout(array $req, ?array $user, ?string $orderId = null):
     // hard-to-guess key of the result page.
     $rrn = 'MAYA-' . strtoupper(bin2hex(random_bytes(12)));
     $amount = round((float) $req['item']['price'], 2);
-    db_run('INSERT INTO maya_checkouts (rrn, environment, user_id, invoice_id, order_id, item_type, item_name, amount, customer_name, customer_email, customer_phone)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [$rrn, maya_environment(), $user['id'] ?? null, $req['invoice']['id'] ?? null, $orderId, $req['itemType'], $req['item']['name'], $amount, $req['name'], $req['email'], $req['phone']]);
+    db_run('INSERT INTO maya_checkouts (rrn, environment, user_id, invoice_id, order_id, card_order_id, item_type, item_name, amount, customer_name, customer_email, customer_phone)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [$rrn, maya_environment(), $user['id'] ?? null, $req['invoice']['id'] ?? null, $orderId, $cardOrderId, $req['itemType'], $req['item']['name'], $amount, $req['name'], $req['email'], $req['phone']]);
 
-    $back = fn (string $result) => base_url() . '/index.php?' . http_build_query($orderId !== null
+    $back = fn (string $result) => $cardOrderId !== null ? card_order_back_url($cardOrderId, $rrn, $result) : base_url() . '/index.php?' . http_build_query($orderId !== null
         ? ['view' => 'backoffice', 'tab' => 'shop', 'shop' => 'orders', 'maya' => $rrn, 'result' => $result]
         : ['view' => 'pay', 'maya' => $rrn, 'result' => $result]);
     [$first, $last] = maya_buyer_name($req['name']);
@@ -173,7 +181,7 @@ function maya_start_checkout(array $req, ?array $user, ?string $orderId = null):
  */
 function maya_settled(array $row): bool
 {
-    return $row['payment_id'] !== null || ($row['order_id'] !== null && $row['status'] === 'PAYMENT_SUCCESS');
+    return $row['payment_id'] !== null || (($row['order_id'] !== null || ($row['card_order_id'] ?? null) !== null) && $row['status'] === 'PAYMENT_SUCCESS');
 }
 
 /** 'paid', 'failed' or 'pending' for a maya_checkouts row. */
@@ -215,6 +223,9 @@ function maya_sync(string $rrn): ?array
             // The shop order stays in the records as cancelled; a later success still marks it paid.
             db_run('UPDATE mlm_orders SET status = "cancelled" WHERE id = ? AND status = "awaiting_payment"', [$row['order_id']]);
         }
+        if ($row['card_order_id'] !== null && in_array($status, MAYA_UNPAID_FINAL, true)) {
+            db_run('UPDATE card_orders SET status = "cancelled" WHERE id = ? AND status = "awaiting_payment"', [$row['card_order_id']]);
+        }
         return db_one('SELECT * FROM maya_checkouts WHERE rrn = ?', [$rrn]);
     }
 
@@ -234,10 +245,19 @@ function maya_sync(string $rrn): ?array
     $note = $paidWith . ' Digital identity activated.';
 
     // [payment id, user id] for the request that recorded it; null for any other.
-    $paid = db_tx(function () use ($rrn, $note, $paidWith) {
+    $cardPaid = null; // a card order this request recorded: finished after the transaction
+    $paid = db_tx(function () use ($rrn, $note, $paidWith, &$cardPaid) {
         $locked = db_one('SELECT * FROM maya_checkouts WHERE rrn = ? FOR UPDATE', [$rrn]);
         if (maya_settled($locked)) {
             return null; // Another request recorded it first.
+        }
+        if ($locked['card_order_id'] !== null) {
+            // A product on a member's card: the member's balance gets the sale (no membership payment).
+            if (card_order_paid($locked['card_order_id'], $paidWith)) {
+                $cardPaid = $locked['card_order_id'];
+            }
+            db_run('UPDATE maya_checkouts SET status = "PAYMENT_SUCCESS" WHERE rrn = ?', [$rrn]);
+            return null;
         }
         if ($locked['order_id'] !== null) {
             // A Member Shop order (not a membership payment: nothing goes in the payments ledger).
@@ -260,6 +280,9 @@ function maya_sync(string $rrn): ?array
     });
     if ($paid !== null) {
         checkout_after_payment(...$paid);
+    }
+    if ($cardPaid !== null) {
+        card_order_after_paid($cardPaid);
     }
     return db_one('SELECT * FROM maya_checkouts WHERE rrn = ?', [$rrn]);
 }

@@ -43,8 +43,10 @@
     num: function (n) {
       return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 3 });
     },
+    // Whole amounts as ₱42,800; the others with two decimals (₱99.50), like peso() in PHP.
     peso: function (n) {
-      return '₱' + EVO.fmt.num(n);
+      n = Number(n || 0);
+      return '₱' + (Math.abs(n - Math.round(n)) < 0.005 ? EVO.fmt.num(n) : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
     },
     datetime: function (ms) {
       return new Date(ms).toLocaleString('en-US');
@@ -342,7 +344,11 @@
       var offEl = pw.querySelector('[data-when-hidden]');
       if (onEl) onEl.hidden = !show;
       if (offEl) offEl.hidden = show;
-      if (pw.hasAttribute('data-title-shown')) pw.title = show ? pw.getAttribute('data-title-shown') : pw.getAttribute('data-title-hidden');
+      if (pw.hasAttribute('data-title-shown')) {
+        pw.title = show ? pw.getAttribute('data-title-shown') : pw.getAttribute('data-title-hidden');
+        pw.setAttribute('aria-label', pw.title);
+      }
+      pw.setAttribute('aria-pressed', show ? 'true' : 'false');
       return;
     }
 
@@ -356,6 +362,10 @@
         closeDropdowns();
         menu.hidden = !willOpen;
         ddToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        // A long "Switch Active Account" list scrolls: open it with the current account in view.
+        var list = willOpen && menu.querySelector('.evo-switch-list');
+        var cur = list && list.querySelector('[aria-current="true"]');
+        if (cur) list.scrollTop = cur.offsetTop - (list.clientHeight - cur.offsetHeight) / 2;
       }
       return;
     }
@@ -478,6 +488,17 @@
     } catch (e) {}
     setupInstall();
     showFlash();
+    // A tab bar wider than the screen scrolls to its open tab (e.g. Backoffice → 11. Mentor Academy).
+    EVO.qsa('[data-tab-group]').forEach(function (bar) {
+      if (bar.scrollWidth <= bar.clientWidth) return;
+      var panel = EVO.qsa('[data-tab-panel][data-group="' + bar.getAttribute('data-tab-group') + '"]').filter(function (p) {
+        return !p.hidden;
+      })[0];
+      var btn = panel && EVO.qs('[data-tab="' + panel.getAttribute('data-tab-panel') + '"]', bar);
+      if (!btn) return;
+      var left = btn.getBoundingClientRect().left - bar.getBoundingClientRect().left;
+      if (left < 0 || left + btn.offsetWidth > bar.clientWidth) bar.scrollLeft += left - 16;
+    });
     if (EVO.user) {
       try {
         localStorage.setItem('neo_is_authenticated', 'true');

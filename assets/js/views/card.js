@@ -1,4 +1,5 @@
-/* 1EVOAI public card: QR code, share, vCard send, membership application, NFC tap, language, keynote video. */
+/* 1EVOAI public card: QR code, share, vCard send, membership application, NFC tap, language, keynote video,
+   and buying the member's own products with Maya (card.buy). */
 (function () {
   'use strict';
   var page = (window.EVO_PAGE || {}).card || {};
@@ -32,7 +33,7 @@
     var svg = document.getElementById('public-qr-svg');
     if (!svg || svg.getAttribute('data-ready') || typeof window.qrcode !== 'function') return;
     var qr = window.qrcode(0, 'H');
-    qr.addData(page.shareUrl);
+    qr.addData(page.qrUrl || page.shareUrl); // the 1EVOAI card address, not the member's own domain
     qr.make();
     var count = qr.getModuleCount();
     var margin = 12;
@@ -233,9 +234,10 @@
     }
     var pay = ev.target.closest('[data-join-pay]');
     if (pay) {
-      // Payments happen on the payment page (Maya Checkout and the receipt).
+      // Signing up happens on the sign-up form (Maya Checkout or an activation code and PIN), with the
+      // card owner's Referrer ID and this package filled in (page.payUrls, views/card.php).
       EVO.closeModal('card-join');
-      window.location.href = (page.payUrls || {})[tiers[joinTier].item] || EVO.url('pay', { checkout: tiers[joinTier].item });
+      window.location.href = (page.payUrls || {})[tiers[joinTier].item] || EVO.url('main', { package: tiers[joinTier].item }) + '#register';
     }
   });
 
@@ -274,4 +276,100 @@
           label.textContent = prev;
         });
     });
+
+  /* ---------------- The member's products: buy with Maya ---------------- */
+  var buyForm = document.getElementById('card-buy-form');
+  if (buyForm) {
+    var products = page.products || [];
+    var current = null;
+    var buyErr = buyForm.querySelector('[data-buy-error]');
+    var qty = buyForm.elements.quantity;
+    var peso = function (n) {
+      return EVO.fmt.peso(n);
+    };
+    var maxQty = function () {
+      return current && current.stock !== null ? Math.min(99, current.stock) : 99;
+    };
+    var renderTotal = function () {
+      var q = Math.max(1, Math.min(maxQty(), parseInt(qty.value, 10) || 1));
+      qty.value = q;
+      var total = Math.round(current.price * q * 100) / 100;
+      buyForm.querySelector('[data-buy-total]').textContent = peso(total);
+      buyForm.querySelector('[data-buy-submit]').textContent = 'Pay ' + peso(total) + ' with Maya';
+    };
+    document.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-card-buy]');
+      if (!b) return;
+      current = products.filter(function (p) {
+        return p.id === b.getAttribute('data-card-buy');
+      })[0];
+      if (!current) return;
+      buyForm.elements.productId.value = current.id;
+      buyForm.querySelector('[data-buy-image]').src = current.image;
+      buyForm.querySelector('[data-buy-name]').textContent = current.name;
+      buyForm.querySelector('[data-buy-price]').textContent = peso(current.price) + ' each';
+      qty.value = 1;
+      qty.max = maxQty();
+      buyErr.hidden = true;
+      renderTotal();
+      EVO.openModal('card-buy');
+    });
+    buyForm.addEventListener('click', function (ev) {
+      var step = ev.target.closest('[data-buy-step]');
+      if (!step) return;
+      qty.value = (parseInt(qty.value, 10) || 1) + parseInt(step.getAttribute('data-buy-step'), 10);
+      renderTotal();
+    });
+    qty.addEventListener('change', renderTotal);
+    buyForm.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      buyErr.hidden = true;
+      if (!buyForm.reportValidity()) return;
+      var f = buyForm.elements;
+      var btn = buyForm.querySelector('button[type="submit"]');
+      var restore = EVO.busy(btn, 'Opening Maya…');
+      EVO.api('card.buy', {
+        productId: f.productId.value,
+        quantity: f.quantity.value,
+        name: f.name.value,
+        email: f.email.value,
+        phone: f.phone.value,
+        delivery: f.delivery.value,
+        company_website: f.company_website.value,
+      })
+        .then(function (res) {
+          window.location.assign(res.redirectUrl);
+        })
+        .catch(function (e) {
+          restore();
+          buyErr.textContent = e.message;
+          buyErr.hidden = false;
+        });
+    });
+    // Coming back with the browser's Back button from Maya: the button works again.
+    window.addEventListener('pageshow', function (ev) {
+      if (ev.persisted) {
+        var btn = buyForm.querySelector('button[type="submit"]');
+        btn.disabled = false;
+        if (current) renderTotal();
+      }
+    });
+  }
+
+  // Back from Maya before it confirmed the payment: ask again every few seconds, then show the outcome.
+  if (page.orderWait) {
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries++;
+      EVO.api('payments.mayaStatus', { rrn: page.orderWait })
+        .then(function (res) {
+          if (res.state !== 'pending') {
+            clearInterval(timer);
+            window.location.reload();
+          }
+        })
+        .catch(function () {});
+      if (tries >= 40) clearInterval(timer);
+    }, 3000);
+  }
 })();

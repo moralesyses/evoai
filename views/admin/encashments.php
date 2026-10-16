@@ -80,7 +80,7 @@ $enLast = ($enPage - 1) * ENCASH_PER_PAGE + count($enRows);
                     </thead>
                     <tbody class="divide-y divide-zinc-800/80 text-zinc-300">
                         <?php if (!$enSum['months']): ?>
-                            <tr><td colspan="7" class="py-3 text-zinc-500">No encashment requests in the last six months.</td></tr>
+                            <tr><td colspan="7" class="py-3 text-zinc-500">No withdrawal requests in the last six months.</td></tr>
                         <?php endif; ?>
                         <?php foreach ($enSum['months'] as $enMo): ?>
                             <tr>
@@ -101,7 +101,7 @@ $enLast = ($enPage - 1) * ENCASH_PER_PAGE + count($enRows);
 
     <div class="flex flex-col lg:flex-row justify-between gap-3 p-4 rounded-3xl bg-[#111111] border border-[#f3bd35]/20">
         <div>
-            <h3 class="text-sm font-bold text-white">Encashment Requests</h3>
+            <h3 class="text-sm font-bold text-white">Withdrawal Requests</h3>
             <p class="text-[11px] text-zinc-500">Pending requests first (oldest at the top), then released and rejected ones (newest first).</p>
             <p class="text-xs text-zinc-400">The amount left the member's balance when they asked. Send the net payout, then <strong class="text-zinc-200">Release</strong> it with the transaction number; or <strong class="text-zinc-200">Reject</strong> it to return the amount to their balance.</p>
         </div>
@@ -110,7 +110,7 @@ $enLast = ($enPage - 1) * ENCASH_PER_PAGE + count($enRows);
             <input type="hidden" name="tab" value="encashments">
             <div class="relative w-full sm:w-72">
                 <?= icon('search', 'w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2') ?>
-                <input name="q" type="search" value="<?= e($enF['q']) ?>" maxlength="100" placeholder="Member, head ID, reference" aria-label="Search by member, head ID, account details or reference" class="w-full pl-9 pr-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#f3bd35]">
+                <input name="q" type="search" value="<?= e($enF['q']) ?>" maxlength="100" placeholder="Member, account ID, reference" aria-label="Search by member, account ID, account details or reference" class="w-full pl-9 pr-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#f3bd35]">
             </div>
             <select name="status" aria-label="Filter by status" class="<?= $enField ?>">
                 <option value="">All statuses</option>
@@ -227,7 +227,7 @@ $enLast = ($enPage - 1) * ENCASH_PER_PAGE + count($enRows);
                 </table>
             </div>
         <?php else: ?>
-            <p class="px-4 py-8 text-center text-xs text-zinc-500"><?= $enFiltered ? 'No encashment requests match these filters.' : 'No encashment requests yet.' ?></p>
+            <p class="px-4 py-8 text-center text-xs text-zinc-500"><?= $enFiltered ? 'No withdrawal requests match these filters.' : 'No withdrawal requests yet.' ?></p>
         <?php endif; ?>
     </div>
     <?php if ($enPages > 1): ?>
@@ -248,7 +248,7 @@ $enLast = ($enPage - 1) * ENCASH_PER_PAGE + count($enRows);
     <div data-modal="admin-en-release" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="en-release-title">
         <form data-en-release-form class="w-full max-w-md bg-[#141414] border border-emerald-500/40 rounded-3xl p-6 shadow-2xl space-y-4 text-xs" novalidate>
             <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <h4 class="font-bold text-white text-sm" id="en-release-title">Release Encashment</h4>
+                <h4 class="font-bold text-white text-sm" id="en-release-title">Release Withdrawal</h4>
                 <button type="button" data-close-modal class="text-zinc-400 hover:text-white" aria-label="Close"><?= icon('x', 'w-4 h-4') ?></button>
             </div>
             <div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-1.5" data-en-summary></div>
@@ -268,7 +268,7 @@ $enLast = ($enPage - 1) * ENCASH_PER_PAGE + count($enRows);
     <div data-modal="admin-en-reject" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="en-reject-title">
         <form data-en-reject-form class="w-full max-w-md bg-[#141414] border border-rose-500/40 rounded-3xl p-6 shadow-2xl space-y-4 text-xs" novalidate>
             <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <h4 class="font-bold text-white text-sm" id="en-reject-title">Reject Encashment</h4>
+                <h4 class="font-bold text-white text-sm" id="en-reject-title">Reject Withdrawal</h4>
                 <button type="button" data-close-modal class="text-zinc-400 hover:text-white" aria-label="Close"><?= icon('x', 'w-4 h-4') ?></button>
             </div>
             <div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-1.5" data-en-summary></div>
@@ -286,7 +286,7 @@ $enLast = ($enPage - 1) * ENCASH_PER_PAGE + count($enRows);
     <div data-modal="admin-en-bulk-release" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="en-bulk-release-title">
         <form data-en-bulk-release-form class="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[#141414] border border-emerald-500/40 rounded-3xl p-6 shadow-2xl space-y-4 text-xs" novalidate>
             <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <h4 class="font-bold text-white text-sm" id="en-bulk-release-title">Release <span data-en-bulk-n></span> Encashments</h4>
+                <h4 class="font-bold text-white text-sm" id="en-bulk-release-title">Release <span data-en-bulk-n></span> Withdrawals</h4>
                 <button type="button" data-close-modal class="text-zinc-400 hover:text-white" aria-label="Close"><?= icon('x', 'w-4 h-4') ?></button>
             </div>
             <p class="text-[11px] text-zinc-400">Send each <strong class="text-white">net amount</strong>, then enter its transaction number. For one batch payout, type the batch reference once and click <strong class="text-zinc-200">Use for all</strong>. Each member is notified.</p>
@@ -311,7 +311,7 @@ $enLast = ($enPage - 1) * ENCASH_PER_PAGE + count($enRows);
     <div data-modal="admin-en-bulk-reject" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="en-bulk-reject-title">
         <form data-en-bulk-reject-form class="w-full max-w-md max-h-[90vh] overflow-y-auto bg-[#141414] border border-rose-500/40 rounded-3xl p-6 shadow-2xl space-y-4 text-xs" novalidate>
             <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <h4 class="font-bold text-white text-sm" id="en-bulk-reject-title">Reject <span data-en-bulk-n></span> Encashments</h4>
+                <h4 class="font-bold text-white text-sm" id="en-bulk-reject-title">Reject <span data-en-bulk-n></span> Withdrawals</h4>
                 <button type="button" data-close-modal class="text-zinc-400 hover:text-white" aria-label="Close"><?= icon('x', 'w-4 h-4') ?></button>
             </div>
             <p data-en-bulk-skipped hidden class="text-[11px] text-amber-200"></p>

@@ -5,6 +5,20 @@ AddDefaultCharset UTF-8
 AddType application/manifest+json .webmanifest
 AddType image/svg+xml .svg
 
+# Digital cards at /<link name>, e.g. /juan-dela-cruz (views/card.php sends the
+# older ?view=card / ?card= links there). Only one path segment that isn't a real
+# file or folder; "/juan-dela-cruz/" redirects to "/juan-dela-cruz".
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} ^(.+)/$
+    RewriteRule ^([A-Za-z0-9][A-Za-z0-9-]{0,79})/$ %1 [R=301,L]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^([A-Za-z0-9][A-Za-z0-9-]{0,79})$ index.php?card=$1 [L,QSA]
+</IfModule>
+
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"
     <FilesMatch "sw\.js$">
@@ -13,10 +27,15 @@ AddType image/svg+xml .svg
     </FilesMatch>
 </IfModule>
 
-# Never serve SQL dumps, logs or dotfiles directly.
-<FilesMatch "\.(sql|log|md|ini|bak)$|^\.">
+# Never serve SQL dumps, logs, archives (e.g. a zipped copy of the site) or dotfiles directly.
+<FilesMatch "\.(sql|log|md|ini|bak|zip|tar|gz|tgz|7z|rar)$|^\.">
     Require all denied
 </FilesMatch>
+# Nor anything inside hidden folders such as .git (the code and its history);
+# /.well-known/ stays open for certificate checks.
+<IfModule mod_alias.c>
+    RedirectMatch 403 /\.(?!well-known/)
+</IfModule>
 # Nor Composer's package lists (the libraries in vendor/ have their own deny rule).
 <FilesMatch "^composer\.(json|lock)$">
     Require all denied

@@ -7,9 +7,11 @@
  * partials/card_modals.php. Pay buttons open the payment page (views/pay.php),
  * where Maya Checkout and the receipt live.
  *
- *   (no parameter)  the signed-in member's own card; for visitors, the founder's master card
+ *   (no parameter)  the signed-in member's own card; visitors are asked to sign in
+ *                   (no member's card is shown by default)
  *   ?profile=usr_x  a member's card
- *   ?card=slug      share link: a WeServe member (<id>-<code>) or a member's custom slug
+ *   ?card=slug      a WeServe member (<id>-<code>) or a member's card link name; the
+ *                   address is /<slug> (.htaccess), and the other forms redirect there
  */
 $cms = get_cms();
 $profiles = all_member_profiles();
@@ -17,7 +19,16 @@ $fallbackAvatar = 'assets/images/mike_maranan_executive_portrait.svg';
 
 // ?card= is a WeServe member link (<id>-<code>) or a portal member's custom slug.
 $weserve = null;
-// No card asked for: a signed-in member sees their own card, a visitor the founder's.
+// No card asked for: a signed-in member sees their own card; a visitor is asked to sign in, so no
+// member's card shows by default. A card opened by its own link (/<name>, QR, NFC, ?profile=) stays public.
+$cardAsked = (is_string($_GET['profile'] ?? null) && $_GET['profile'] !== '') || (is_string($_GET['card'] ?? null) && $_GET['card'] !== '');
+if (!$user && !$cardAsked) {
+    $gateTitle = 'Sign in to view your 1EVOAI card';
+    $gateText = 'Members see their own digital card here once signed in. To see someone\'s card, open the link or QR code they shared with you.';
+    $pageMeta = ['title' => 'Sign in · 1EVOAI Card', 'description' => 'Sign in to view your 1EVOAI digital card.', 'noindex' => true];
+    require __DIR__ . '/partials/gate.php';
+    return;
+}
 $profileId = is_string($_GET['profile'] ?? null) && $_GET['profile'] !== '' ? $_GET['profile'] : ($user['id'] ?? MASTER_PROFILE_ID);
 if ($user && $profileId === $user['id'] && !isset($profiles[$profileId])) {
     // Their card profile hasn't been saved yet: show the account's own name and title.
@@ -39,8 +50,12 @@ if (isset($_GET['card']) && is_string($_GET['card'])) {
         $profileId = $bySlug['userId'];
     }
 }
-if (!isset($profiles[$profileId])) {
-    $profileId = MASTER_PROFILE_ID;
+if (!$weserve && !isset($profiles[$profileId])) {
+    // An unknown member: say so, rather than showing someone else's card.
+    http_response_code(404);
+    $pageMeta = ['title' => 'Card not found', 'description' => 'There is no digital card at this address.', 'noindex' => true];
+    require __DIR__ . '/partials/card_not_found.php';
+    return;
 }
 
 $member = null;
@@ -59,6 +74,7 @@ if ($weserve) {
     $socials = [];
     $headline = null;
     $shareUrl = $weserve['shareUrl'];
+    $qrUrl = $shareUrl;
     $vcardUrl = base_path() . '/vcard.php?card=' . rawurlencode($weserve['slug']);
     $manifestQuery = ['card' => $weserve['slug']];
 } else {
@@ -82,11 +98,37 @@ if ($weserve) {
     // The member's own .com domain when their card uses one; otherwise the 1EVOAI link.
     $shareUrl = domain_card_url((string) $cardProfile['userId'])
         ?? ((string) ($cardProfile['customSlug'] ?? '') !== '' || $member === null ? card_share_url($cardProfile) : base_url() . '/index.php?' . http_build_query(['view' => 'card', 'profile' => $profileId]));
+    // The QR code always opens the card here on 1EVOAI (e.g. /juan-dela-cruz), not the member's domain.
+    $qrUrl = card_share_url($cardProfile, false);
     $vcardUrl = base_path() . '/vcard.php?id=' . rawurlencode($profileId);
     $manifestQuery = ['profile' => $profileId];
     // Back to the member's own website (My Website), when they have one.
     $siteBack = site_card_back((string) $cardProfile['userId'], $user);
 }
+// The card's own address is /<link name> (e.g. /juan-dela-cruz; .htaccess); the other ways in
+// (?view=card&profile=…, ?card=…) are sent there. A member's own .com domain keeps its address.
+$cardSlug = $weserve ? $weserve['slug'] : card_slug_clean((string) ($cardProfile['customSlug'] ?? ''));
+$cardPath = base_path() . '/' . $cardSlug;
+if ($cardSlug !== '' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'
+    && parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) !== $cardPath
+    && domain_owner_for_host((string) ($_SERVER['HTTP_HOST'] ?? '')) === null) {
+    $keep = array_diff_key($_GET, ['view' => 1, 'profile' => 1, 'card' => 1]);
+    // Permanent for a named card; the plain ?view=card depends on who is signed in.
+    header('Location: ' . $cardPath . ($keep ? '?' . http_build_query($keep) : ''), true, isset($_GET['profile']) || isset($_GET['card']) ? 301 : 302);
+    return;
+}
+// The member's own design (Backoffice > Digital Card CMS > Card Design) and products (My Products), includes/cards.php.
+$cardOwnerId = $weserve ? '' : (string) $cardProfile['userId'];
+$design = $cardOwnerId !== '' ? card_design($cardOwnerId) : card_design_default();
+[$cardAccent, $cardLight] = card_design_colors($design);
+$cardThemed = $design['accent'] !== '' || $design['theme'] !== 'gold';
+$cardShow = card_design_blocks($design);
+$cardProducts = $cardOwnerId !== '' && in_array('products', $cardShow, true) ? card_products($cardOwnerId, true) : [];
+$cardMaya = maya_enabled();
+// Back from Maya after buying one of the member's products (?maya=<rrn>): paid, waiting or not paid.
+$cardOrderBack = $cardOwnerId !== '' && is_string($_GET['maya'] ?? null)
+    ? card_order_return($_GET['maya'], is_string($_GET['result'] ?? null) ? $_GET['result'] : '', $cardOwnerId) : null;
+$cardFirst = explode(' ', trim($name))[0];
 $quote = ($member['quote'] ?? null) ?: $cms['heroQuote'];
 $subtitle = ($member['subtitle'] ?? null) ?: $cms['heroSubtitle'];
 $visionaryImage = $isMember ? $avatar : media_url($cms['visionaryImageUrl'] ?: ($cms['avatarUrl'] ?: $fallbackAvatar));
@@ -95,8 +137,18 @@ $videoThumb = media_url($cms['featuredVideoThumbnailUrl'] ?: 'assets/images/circ
 $digitalImage = media_url($cms['digitalImageUrl'] ?: 'assets/images/nfc_smart_card_executive.svg');
 $execPrice = num($cms['executivePrice']);
 $chairPrice = num($cms['chairmansPrice']);
-$payExecutive = url('pay', ['checkout' => 'membership_executive']);
-$payChairmans = url('pay', ['checkout' => 'membership_chairmans']);
+// Signing up from a card goes to the sign-up form (pay with Maya Checkout, or an activation code and
+// PIN), with the card owner's Referrer ID and the package filled in. WeServe cards have no account here.
+$cardRef = $cardOwnerId !== '' ? (string) db_value('SELECT id FROM mlm_accounts WHERE user_id = ? ORDER BY head_number, id LIMIT 1', [$cardOwnerId]) : '';
+$cardSignup = static fn (string $package): string => url('main', array_filter(['ref' => $cardRef, 'package' => $package])) . '#register';
+// And this browser remembers the owner, so Create Account uses their Referrer ID even when the visitor
+// reaches it another way (the logo, a later visit to the portal).
+if ($cardRef !== '') {
+    signup_remember_referrer($cardRef);
+}
+$payExecutive = $cardSignup('membership_executive');
+$payChairmans = $cardSignup('membership_chairmans');
+$cardPayNote = $cardMaya ? 'Sign up and pay with Maya (card or wallet) or with an activation code and its PIN.' : 'Sign up with an activation code and its PIN. ' . MAYA_UNAVAILABLE . '.';
 
 track_action('profile_view', $profileId, $user['id'] ?? null);
 
@@ -128,19 +180,22 @@ $pageData['card'] = [
     'profileId' => $profileId,
     'name' => $name,
     'shareUrl' => $shareUrl,
+    'qrUrl' => $qrUrl,
     'vcardUrl' => $vcardUrl,
     'payUrls' => ['membership_executive' => $payExecutive, 'membership_chairmans' => $payChairmans],
     'headlineEn' => [$cms['headlinePart1'] ?: 'CONNECT.', $cms['headlinePart2'] ?: 'GROW.', $cms['headlinePart3'] ?: 'PROSPER.'],
     'i18n' => $translations,
     'videoUrl' => $cms['featuredVideoUrl'] ?: 'https://www.youtube.com/embed/r9XLnqrPZh4',
     'heroCtaText' => $cms['heroCtaText'],
+    'products' => array_map(fn ($p) => ['id' => $p['id'], 'name' => $p['name'], 'price' => $p['price'], 'image' => $p['image'], 'stock' => $p['stock']], $cardProducts),
+    'orderWait' => $cardOrderBack && $cardOrderBack['state'] === 'pending' ? $cardOrderBack['rrn'] : null,
 ];
 $actionBtn = 'flex flex-col items-center justify-center p-2.5 rounded-2xl bg-gradient-to-b from-[#1a1a1a] to-[#121212] border border-[#f3bd35]/20 hover:border-[#f3bd35] active:scale-95 transition-all text-center group';
 $actionIcon = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#ffda72] to-[#f3bd35] flex items-center justify-center text-black mb-1.5 shadow-md group-hover:scale-105 transition-transform';
 $socialLink = 'px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[11px] font-medium text-zinc-300 border border-zinc-800 transition-colors';
 $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px] text-zinc-400 hover:text-[#f3bd35] transition-colors';
 ?>
-<div class="min-h-screen bg-[#070707] text-[#f7f5ef] pb-24 md:pb-12 selection:bg-[#f3bd35]/30">
+<div class="evo-card min-h-screen bg-[#070707] text-[#f7f5ef] pb-24 md:pb-12 selection:bg-[#f3bd35]/30" data-font="<?= e($design['font']) ?>"<?= $cardThemed ? ' data-themed style="--ca: ' . e($cardAccent) . '; --cl: ' . e($cardLight) . ';"' : '' ?>>
     <header class="sticky top-0 z-40 w-full bg-[#070707]/90 backdrop-blur-md border-b border-[#f3bd35]/15 px-3 sm:px-6 py-2.5 flex items-center justify-between">
         <a href="<?= e(url('main')) ?>" class="flex items-center gap-2.5 cursor-pointer group" title="Return to Main Portal">
             <div class="w-8 h-8 rounded-full bg-gradient-to-br from-[#ffda72] to-[#996f13] p-[1.5px] flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
@@ -152,32 +207,8 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
             </div>
         </a>
         <div class="flex items-center gap-2">
-            <div class="relative" data-dropdown>
-                <button type="button" data-dropdown-toggle aria-expanded="false" class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-900 border border-[#f3bd35]/30 text-xs text-zinc-200 hover:text-white transition-colors">
-                    <?= icon('user', 'w-3 h-3 text-[#f3bd35]') ?>
-                    <span class="font-semibold hidden sm:inline"><?= e($name) ?></span>
-                    <span class="font-semibold sm:hidden"><?= e(explode(' ', $name)[0]) ?></span>
-                    <?= icon('chevron-down', 'w-3 h-3 text-zinc-400') ?>
-                </button>
-                <div data-dropdown-menu hidden class="absolute right-0 mt-2 w-64 bg-[#141414] border border-[#f3bd35]/40 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 px-2 py-1 border-b border-zinc-800 mb-1 flex items-center justify-between"><span>Switch Digital Card</span><span class="text-[#f3bd35]">1EVOAI</span></div>
-                    <a href="<?= e(url('card', ['profile' => MASTER_PROFILE_ID])) ?>" class="w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors <?= !$isMember ? 'bg-[#f3bd35] text-black font-bold' : 'text-zinc-200 hover:bg-zinc-800' ?>">
-                        <div><span class="block font-bold"><?= e($cms['name']) ?></span><span class="text-[10px] opacity-75 block">Founder &amp; Master Card</span></div>
-                        <?php if (!$isMember): ?><?= icon('check', 'w-3.5 h-3.5') ?><?php endif; ?>
-                    </a>
-                    <div class="pt-1 mt-1 border-t border-zinc-800 space-y-1">
-                        <span class="text-[9px] font-semibold text-zinc-500 px-2 block">Member Custom Cards:</span>
-                        <?php foreach ($profiles as $p): if ($p['userId'] === MASTER_PROFILE_ID) { continue; } $on = $p['userId'] === $profileId; ?>
-                            <a href="<?= e(url('card', ['profile' => $p['userId']])) ?>" class="w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between transition-colors <?= $on ? 'bg-[#f3bd35] text-black font-bold' : 'text-zinc-300 hover:bg-zinc-800' ?>">
-                                <div><span class="block font-medium"><?= e($p['name']) ?></span><span class="text-[9px] opacity-75 block"><?= e($p['company']) ?></span></div>
-                                <?php if ($on): ?><?= icon('check', 'w-3.5 h-3.5') ?><?php endif; ?>
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-            <a href="<?= e($payExecutive) ?>" title="Pay online with Maya (card or Maya wallet)" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[11px] font-bold shadow hover:brightness-110 active:scale-95 transition-all">
-                <?= icon('credit-card', 'w-3 h-3 text-emerald-200') ?><span class="hidden sm:inline">Pay Online</span><span class="sm:hidden">Pay</span>
+            <a href="<?= e($payExecutive) ?>" title="<?= e($cardPayNote) ?>" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[11px] font-bold shadow hover:brightness-110active:scale-95 transition-all">
+                <?= icon('credit-card', 'w-3 h-3 text-emerald-200') ?><span class="hidden sm:inline">Sign Up</span><span class="sm:hidden">Join</span>
             </a>
             <button type="button" id="card-nfc-tap" title="Simulate NFC Tap from physical card" class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#f3bd35]/10 border border-[#f3bd35]/30 text-[#f3bd35] text-[11px] font-medium hover:bg-[#f3bd35]/20 active:scale-95 transition-all">
                 <?= icon('smartphone', 'w-3 h-3') ?><span class="hidden sm:inline">NFC Tap</span>
@@ -201,9 +232,40 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
                 </span>
             </a>
         <?php endif; ?>
+        <?php if ($cardOrderBack): $cob = $cardOrderBack['order']; ?>
+            <?php if ($cardOrderBack['state'] === 'paid'): ?>
+                <div id="card-order" data-card-order="paid" role="status" class="mb-4 p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-200 flex items-start gap-3">
+                    <?= icon('circle-check-big', 'w-5 h-5 shrink-0 text-emerald-400') ?>
+                    <div>
+                        <span class="block font-bold text-white">Thank you, <?= e(explode(' ', $cob['buyerName'])[0]) ?>! Your payment is confirmed.</span>
+                        <span class="block mt-0.5"><?= e($cob['product']) ?> × <?= (int) $cob['quantity'] ?> · <?= peso($cob['amount']) ?> · order <span class="font-mono"><?= e($cob['id']) ?></span></span>
+                        <span class="block mt-0.5 text-zinc-300"><?= e($cardFirst) ?> will contact you at <?= e($cob['buyerPhone']) ?> or <?= e($cob['buyerEmail']) ?> about delivery.</span>
+                    </div>
+                </div>
+            <?php elseif ($cardOrderBack['state'] === 'pending'): ?>
+                <div id="card-order" data-card-order="pending" role="status" class="mb-4 p-4 rounded-2xl bg-amber-950/40 border border-amber-600/40 text-xs text-amber-200 flex items-center gap-3">
+                    <span class="w-4 h-4 shrink-0 rounded-full border-2 border-amber-300 border-t-transparent animate-spin"></span>
+                    <div>
+                        <span class="block font-bold">Waiting for Maya to confirm your payment (order <?= e($cob['id']) ?>)</span>
+                        <span class="block text-zinc-400">This page updates by itself.</span>
+                    </div>
+                </div>
+            <?php else: ?>
+                <div id="card-order" data-card-order="failed" role="alert" class="mb-4 p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-200 flex items-start gap-3">
+                    <?= icon('circle-alert', 'w-5 h-5 shrink-0 text-rose-400') ?>
+                    <div>
+                        <span class="block font-bold">Your order for <?= e($cob['product']) ?> wasn't paid</span>
+                        <span class="block mt-0.5 text-zinc-300"><?= e($cardOrderBack['message']) ?> You can try again below.</span>
+                    </div>
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
         <div class="relative rounded-3xl bg-gradient-to-b from-[#141414] via-[#0d0d0d] to-[#070707] border border-[#f3bd35]/30 p-6 shadow-2xl text-center overflow-hidden mb-6">
             <div class="absolute -top-20 left-1/2 -translate-x-1/2 w-64 h-64 bg-[#f3bd35]/15 rounded-full blur-3xl pointer-events-none"></div>
-            <div class="relative inline-block mb-4">
+            <?php if ($design['cover'] !== ''): ?>
+                <div class="evo-card-cover"><img src="<?= e(media_url($design['cover'])) ?>" alt=""></div>
+            <?php endif; ?>
+            <div class="relative inline-block mb-4<?= $design['cover'] !== '' ? ' evo-card-avatar' : '' ?>">
                 <div class="w-32 h-32 rounded-full p-[3px] bg-gradient-to-tr from-[#ffda72] via-[#f3bd35] to-[#8f6510] shadow-xl mx-auto overflow-hidden">
                     <?php if ($avatar !== ''): ?>
                         <img src="<?= e($avatar) ?>" alt="<?= e($name) ?>" referrerpolicy="no-referrer" class="w-full h-full object-cover rounded-full" <?= $isMember ? 'data-initials="' . e($initials) . '"' : 'data-fallback="' . e(media_url($fallbackAvatar)) . '"' ?>>
@@ -240,6 +302,7 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
             </div>
         </div>
 
+        <?php /* The blocks below are captured and shown in the member's order (Card Design). */ $cardBlockHtml = []; ob_start(); ?>
         <section class="text-center py-6 mb-6">
             <div class="inline-block px-3 py-1 rounded-full bg-[#f3bd35]/15 border border-[#f3bd35]/30 text-[#f3bd35] text-[10px] font-bold tracking-widest uppercase mb-3"><?= e($cms['communityBadge'] ?: 'The Executive Community') ?></div>
             <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-white mb-2 leading-tight">
@@ -257,13 +320,14 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button type="button" data-join="executive" data-join-label class="w-full py-3.5 bg-gradient-to-r from-[#ffda72] via-[#f3bd35] to-[#f3bd35] text-black font-extrabold text-xs sm:text-sm rounded-2xl shadow-xl hover:brightness-105 active:scale-98 transition-all"><?= e($cms['heroCtaText'] ?: 'JOIN THE CIRCLE →') ?></button>
                     <a href="<?= e($payExecutive) ?>" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2 active:scale-98 transition-all">
-                        <?= icon('credit-card', 'w-4 h-4 text-emerald-200') ?><span>Pay Online (₱<?= $execPrice ?>)</span>
+                        <?= icon('credit-card', 'w-4 h-4 text-emerald-200') ?><span>Sign Up (₱<?= $execPrice ?>)</span>
                     </a>
                 </div>
                 <a href="#what-is-mmmc" class="block w-full py-3 border border-[#f3bd35]/30 text-[#ffda72] font-bold text-xs rounded-2xl hover:bg-[#f3bd35]/10 transition-colors"><?= e($cms['heroSecondaryCtaText'] ?: 'DISCOVER 88MMMC') ?></a>
             </div>
         </section>
 
+        <?php $cardBlockHtml['community'] = ob_get_clean(); ob_start(); ?>
         <?php if ($showAbout): ?>
         <section id="who-is-mike" class="mb-6">
             <div class="rounded-3xl bg-[#111111] border border-[#f3bd35]/25 p-5 shadow-xl">
@@ -278,6 +342,7 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
             </div>
         </section>
         <?php endif; ?>
+        <?php $cardBlockHtml['about'] = ob_get_clean(); ob_start(); ?>
 
         <section class="mb-6">
             <div class="rounded-3xl bg-[#111111] border border-[#f3bd35]/25 p-5 shadow-xl text-center">
@@ -293,6 +358,7 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
             </div>
         </section>
 
+        <?php $cardBlockHtml['video'] = ob_get_clean(); ob_start(); ?>
         <section id="what-is-mmmc" class="mb-6">
             <div class="rounded-3xl bg-[#111111] border border-[#f3bd35]/25 p-5 shadow-xl">
                 <div class="text-[11px] font-bold tracking-wider text-[#f3bd35] uppercase mb-1"><?= e($cms['societyKicker'] ?: 'Executive Society') ?></div>
@@ -378,6 +444,7 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
             </div>
         </section>
 
+        <?php $cardBlockHtml['circle'] = ob_get_clean(); ob_start(); ?>
         <section id="membership" class="mb-8">
             <div class="text-center mb-5">
                 <div class="text-[11px] font-bold tracking-wider text-[#f3bd35] uppercase mb-1"><?= e($cms['membershipKicker'] ?: 'Membership Tiers') ?></div>
@@ -399,7 +466,7 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <button type="button" data-join="executive" class="w-full py-3 bg-zinc-800 hover:bg-[#f3bd35] hover:text-black text-white font-bold text-xs rounded-xl transition-all">BECOME AN <?= e(mb_strtoupper($cms['executiveTierName'] ?: 'Executive Member')) ?></button>
                         <a href="<?= e($payExecutive) ?>" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow">
-                            <?= icon('credit-card', 'w-3.5 h-3.5 text-emerald-200') ?><span>Pay ₱<?= $execPrice ?> Online</span>
+                            <?= icon('credit-card', 'w-3.5 h-3.5 text-emerald-200') ?><span>Sign Up · ₱<?= $execPrice ?></span>
                         </a>
                     </div>
                 </div>
@@ -419,7 +486,7 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <button type="button" data-join="chairmans" class="w-full py-3.5 bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-extrabold text-xs rounded-xl shadow-lg hover:brightness-105 active:scale-98 transition-all">JOIN <?= e(mb_strtoupper($cms['chairmansTierName'] ?: "Chairman's Circle")) ?></button>
                         <a href="<?= e($payChairmans) ?>" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:brightness-110 text-white font-extrabold text-xs rounded-xl shadow-lg flex items-center justify-center gap-1.5 active:scale-98 transition-all">
-                            <?= icon('credit-card', 'w-4 h-4 text-emerald-200') ?><span>VIP Checkout (₱<?= $chairPrice ?>)</span>
+                            <?= icon('credit-card', 'w-4 h-4 text-emerald-200') ?><span>Sign Up · ₱<?= $chairPrice ?></span>
                         </a>
                     </div>
                 </div>
@@ -434,19 +501,49 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
             <div class="flex flex-col sm:flex-row items-center justify-center gap-2 max-w-sm mx-auto">
                 <button type="button" data-join="executive" class="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-extrabold text-xs rounded-xl shadow-lg hover:brightness-105 transition-all"><?= e($cms['finalCtaButtonText'] ?: 'JOIN THE CIRCLE →') ?></button>
                 <a href="<?= e($payExecutive) ?>" class="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-extrabold text-xs rounded-xl shadow-lg flex items-center justify-center gap-1.5 transition-all">
-                    <?= icon('credit-card', 'w-3.5 h-3.5 text-emerald-200') ?><span>Instant Online Payment</span>
+                    <?= icon('credit-card', 'w-3.5 h-3.5 text-emerald-200') ?><span>Sign Up Now</span>
                 </a>
             </div>
+            <p class="text-[11px] text-zinc-500 max-w-sm mx-auto mt-3" data-card-pay-note><?= e($cardPayNote) ?></p>
         </section>
+
+        <?php $cardBlockHtml['membership'] = ob_get_clean(); ob_start(); ?>
+        <?php if ($cardProducts): ?>
+        <section id="my-products" class="mb-6">
+            <div class="rounded-3xl bg-[#111111] border border-[#f3bd35]/25 p-5 shadow-xl">
+                <div class="text-[11px] font-bold tracking-wider text-[#f3bd35] uppercase mb-1">My Products</div>
+                <h3 class="text-xl font-bold text-white mb-4">Shop with <?= e($cardFirst) ?></h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <?php foreach ($cardProducts as $cp): $cpOut = $cp['stock'] === 0; ?>
+                        <div class="rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden flex flex-col">
+                            <img src="<?= e($cp['image']) ?>" alt="<?= e($cp['name']) ?>" loading="lazy" class="w-full aspect-square object-cover bg-zinc-950">
+                            <div class="p-3 flex flex-col flex-1 gap-1">
+                                <span class="text-xs font-bold text-white line-clamp-2"><?= e($cp['name']) ?></span>
+                                <span class="text-sm font-black text-[#ffda72] font-mono"><?= peso($cp['price']) ?></span>
+                                <?php if ($cp['description'] !== ''): ?><span class="text-[11px] text-zinc-400 line-clamp-3"><?= e($cp['description']) ?></span><?php endif; ?>
+                                <?php if ($cp['stock'] !== null && $cp['stock'] > 0 && $cp['stock'] <= 5): ?><span class="text-[10px] text-amber-300">Only <?= (int) $cp['stock'] ?> left</span><?php endif; ?>
+                                <button type="button" data-card-buy="<?= e($cp['id']) ?>" class="mt-auto w-full py-2 rounded-xl bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black text-[11px] font-extrabold disabled:opacity-50"<?= $cpOut ? ' disabled' : '' ?>><?= $cpOut ? 'Sold out' : 'Buy now' ?></button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php if (!$cardMaya): ?><p class="mt-3 text-[11px] text-zinc-400"><?= e(MAYA_UNAVAILABLE) ?>. Contact <?= e($cardFirst) ?> to order.</p><?php endif; ?>
+            </div>
+        </section>
+        <?php endif; ?>
+        <?php $cardBlockHtml['products'] = ob_get_clean(); ?>
+        <?php foreach ($cardShow as $cardBlockId) { echo $cardBlockHtml[$cardBlockId] ?? ''; } ?>
 
         <footer class="pt-8 pb-4 text-center text-[10px] text-zinc-500 border-t border-zinc-900">
             <p class="mb-2"><?= e($cms['footerText'] ?: "MIKE MARANAN MILLIONAIRE'S CIRCLE • CONNECT. GROW. PROSPER.") ?></p>
             <div class="flex flex-wrap items-center justify-center gap-3 text-zinc-400">
                 <span>Powered by 1EVOAI &amp; EVO Card Technology</span>
                 <span>·</span>
-                <a href="<?= e(url('backoffice')) ?>" class="text-[#ffda72] hover:underline font-semibold">Member Backoffice &amp; Complan</a>
-                <span>·</span>
-                <a href="<?= e(url('admin')) ?>" class="text-[#f3bd35] hover:underline font-semibold">Management Admin</a>
+                <a href="<?= e(url('backoffice')) ?>" class="text-[#ffda72] hover:underline font-semibold">Member Backoffice &amp; Rewards Plan</a>
+                <?php if ($user && is_admin($user)): ?>
+                    <span>·</span>
+                    <a href="<?= e(url('admin')) ?>" class="text-[#f3bd35] hover:underline font-semibold">Management Admin</a>
+                <?php endif; ?>
             </div>
         </footer>
     </div>
@@ -459,5 +556,44 @@ $bottomBtn = 'flex flex-col items-center justify-center min-w-[54px] min-h-[44px
         <button type="button" data-card-qr class="<?= $bottomBtn ?>"><?= icon('qr-code', 'w-5 h-5 text-[#f3bd35]') ?><span class="text-[10px] font-medium mt-0.5">QR</span></button>
     </div>
 
+    <?php if ($cardProducts): ?>
+    <div data-modal="card-buy" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="card-buy-title">
+        <div class="w-full max-w-md bg-[#141414] border border-[#f3bd35]/40 rounded-3xl p-6 shadow-2xl space-y-4 text-xs text-left max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
+                <h4 class="font-bold text-white text-sm" id="card-buy-title">Buy from <?= e($cardFirst) ?></h4>
+                <button type="button" data-close-modal class="text-zinc-400 hover:text-white" aria-label="Close"><?= icon('x', 'w-4 h-4') ?></button>
+            </div>
+            <form id="card-buy-form" class="space-y-3" novalidate>
+                <input type="hidden" name="productId" value="">
+                <input type="text" name="company_website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="evo-hp">
+                <div class="flex items-center gap-3">
+                    <img data-buy-image src="" alt="" class="w-16 h-16 rounded-xl object-cover bg-zinc-950 border border-zinc-800 shrink-0">
+                    <div class="min-w-0">
+                        <span data-buy-name class="block font-bold text-white text-sm"></span>
+                        <span data-buy-price class="block text-[#ffda72] font-mono font-bold"></span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                    <label for="card-buy-qty" class="text-[11px] font-semibold text-zinc-300">Quantity</label>
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" data-buy-step="-1" class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200" aria-label="One less">−</button>
+                        <input id="card-buy-qty" name="quantity" type="number" min="1" value="1" class="w-14 px-2 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-center text-white font-mono">
+                        <button type="button" data-buy-step="1" class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200" aria-label="One more">+</button>
+                    </div>
+                </div>
+                <div><label for="card-buy-name" class="block text-[11px] font-semibold text-zinc-300 mb-1">Your name *</label><input id="card-buy-name" name="name" type="text" required maxlength="150" autocomplete="name" value="<?= e($user['name'] ?? '') ?>" class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white focus:outline-none focus:border-[#f3bd35]"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label for="card-buy-email" class="block text-[11px] font-semibold text-zinc-300 mb-1">Email *</label><input id="card-buy-email" name="email" type="email" required maxlength="190" autocomplete="email" value="<?= e($user['email'] ?? '') ?>" class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white focus:outline-none focus:border-[#f3bd35]"></div>
+                    <div><label for="card-buy-phone" class="block text-[11px] font-semibold text-zinc-300 mb-1">Mobile *</label><input id="card-buy-phone" name="phone" type="tel" required maxlength="60" autocomplete="tel" placeholder="+63 917..." class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white focus:outline-none focus:border-[#f3bd35]"></div>
+                </div>
+                <div><label for="card-buy-delivery" class="block text-[11px] font-semibold text-zinc-300 mb-1">Delivery address or notes</label><textarea id="card-buy-delivery" name="delivery" rows="2" maxlength="500" placeholder="Where should <?= e($cardFirst) ?> send it?" class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white focus:outline-none focus:border-[#f3bd35]"></textarea></div>
+                <div class="flex items-center justify-between pt-2 border-t border-zinc-800"><span class="text-zinc-400">Total</span><span data-buy-total class="text-base font-black text-[#ffda72] font-mono"></span></div>
+                <p data-buy-error hidden role="alert" class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300"></p>
+                <button type="submit"<?= $cardMaya ? '' : ' disabled' ?> class="w-full py-3 bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-50"><?= icon('lock', 'w-3.5 h-3.5') ?><span data-buy-submit>Pay with Maya</span></button>
+                <p class="text-[10px] text-zinc-500 text-center"><?= $cardMaya ? 'You pay on Maya’s secure page with a card or your Maya wallet, then come back here.' : 'Online payment isn’t available yet. Contact ' . e($cardFirst) . ' to order.' ?></p>
+            </form>
+        </div>
+    </div>
+    <?php endif; ?>
     <?php require __DIR__ . '/partials/card_modals.php'; ?>
 </div>

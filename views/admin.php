@@ -18,8 +18,10 @@ $adminTabs = [
     ['id' => 'members', 'label' => 'Member Access & Roles', 'icon' => 'users', 'badge' => 'Roster'],
     ['id' => 'users', 'label' => 'Users', 'icon' => 'user-check', 'badge' => $isAdmin ? number_format((int) db_value('SELECT COUNT(*) FROM users')) : null],
     ['id' => 'codes', 'label' => 'Activation Codes', 'icon' => 'key', 'badge' => $isAdmin ? number_format((int) db_value('SELECT COUNT(*) FROM mlm_codes WHERE status = "active"')) : null],
-    ['id' => 'complan', 'label' => 'Binary Complan', 'icon' => 'git-fork', 'badge' => $isAdmin ? mlm_complan()['pairsPerDay'] . ' pairs/day' : null],
-    ['id' => 'encashments', 'label' => 'Encashments', 'icon' => 'wallet', 'badge' => $isAdmin && ($encashPending = (int) db_value('SELECT COUNT(*) FROM mlm_encashments WHERE status = "pending"')) > 0 ? $encashPending . ' pending' : null],
+    ['id' => 'complan', 'label' => 'Rewards Plan', 'icon' => 'git-fork', 'badge' => $isAdmin ? mlm_complan()['pairsPerDay'] . ' matches/day' : null],
+    ['id' => 'encashments', 'label' => 'Withdrawals', 'icon' => 'wallet', 'badge' => $isAdmin && ($encashPending = (int) db_value('SELECT COUNT(*) FROM mlm_encashments WHERE status = "pending"')) > 0 ? $encashPending . ' pending' : null],
+    ['id' => 'products', 'label' => 'Shop Products', 'icon' => 'shopping-bag', 'badge' => $isAdmin ? number_format((int) db_value('SELECT COUNT(*) FROM mlm_products WHERE active = 1')) : null],
+    ['id' => 'academy', 'label' => 'Mentor Academy', 'icon' => 'graduation-cap', 'badge' => $isAdmin ? number_format((int) db_value('SELECT COUNT(*) FROM academy_materials WHERE published = 1')) : null],
     ['id' => 'payments', 'label' => 'Online Payments & Ledger', 'icon' => 'credit-card', 'badge' => 'Live'],
     ['id' => 'domains', 'label' => '.com Domains', 'icon' => 'globe', 'badge' => $isAdmin && ($domainsWaiting = (int) db_value('SELECT COUNT(*) FROM domain_orders WHERE status = "paid_failed_registration"')) > 0 ? $domainsWaiting . ' to retry' : null],
     ['id' => 'leads', 'label' => 'Global Leads CRM', 'icon' => 'file-spreadsheet'],
@@ -44,7 +46,7 @@ if ($isAdmin) {
     $cms = get_cms();
     $auditLogs = list_audit(50);
     $pageData['admin'] = ['users' => $users, 'profiles' => $profiles, 'payments' => $payments, 'leads' => $leads, 'cms' => $cms];
-    foreach (['analytics', 'members', 'users', 'codes', 'complan', 'encashments', 'payments', 'domains', 'leads', 'cms', 'security'] as $js) {
+    foreach (['analytics', 'members', 'users', 'codes', 'complan', 'encashments', 'products', 'academy', 'payments', 'domains', 'leads', 'cms', 'security'] as $js) {
         if (is_file(APP_ROOT . '/assets/js/views/admin-' . $js . '.js')) {
             $pageScripts[] = 'assets/js/views/admin-' . $js . '.js';
         }

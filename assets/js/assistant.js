@@ -92,7 +92,7 @@
   }
 
   function render() {
-    var html = bubble('assistant', format("Hi! I'm the 88MMM Assistant. Ask me about the compensation plan, joining, activation codes, cashing out or anything in the portal."));
+    var html = bubble('assistant', format("Hi! I'm the 88MMM Assistant. Ask me about the rewards plan, joining, activation codes, cashing out or anything in the portal."));
     messages.forEach(function (m) {
       html += bubble(m.role, m.role === 'user' ? EVO.esc(m.content).replace(/\n/g, '<br>') : format(m.content));
     });

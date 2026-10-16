@@ -31,7 +31,11 @@ return [
         $status = str_in($in, 'status', 20);
         if (isset($in['filter']) && is_array($in['filter'])) {
             $f = $in['filter'];
-            $codes = admin_matching_codes(str_in($f, 'q', 100), str_in($f, 'status', 20), str_in($f, 'package', 40));
+            [$from, $to, $rangeError] = code_serial_range(str_in($f, 'from', 20), str_in($f, 'to', 20));
+            if ($rangeError !== null) {
+                api_fail($rangeError);
+            }
+            $codes = admin_matching_codes(str_in($f, 'q', 100), str_in($f, 'status', 20), str_in($f, 'package', 40), $from, $to);
             if (!$codes) {
                 api_fail('No unused codes match these filters.');
             }

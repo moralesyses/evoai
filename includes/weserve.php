@@ -3,7 +3,7 @@
  * WeServe member cards, built from the UserProfile and NetworkAccount tables
  * copied from the WeServe digital vCard app (database/weserve_members.sql).
  *
- * Cards live at ?card=<userId>-<code>; the code is an HMAC of the id signed
+ * Cards live at /<userId>-<code> (?card=… redirects there); the code is an HMAC of the id signed
  * with card.link_secret, so other members' links can't be guessed. Only the
  * columns in WESERVE_MEMBER_COLUMNS are read — birth date, gender and tax ID
  * never leave the database. Only users with a network account in one of the
@@ -87,7 +87,7 @@ function weserve_load_member(int $userId): ?array
         'title'    => 'Member since ' . substr((string) $row['createdAt'], 0, 4),
         'initials' => mb_strtoupper(mb_substr($first, 0, 1) . mb_substr($last, 0, 1)),
         'vcard'    => ['first' => $first, 'middle' => $initial, 'last' => $last, 'suffix' => $suffix],
-        'shareUrl' => base_url() . '/?card=' . rawurlencode($slug),
+        'shareUrl' => base_url() . '/' . $slug,
     ];
 }
 

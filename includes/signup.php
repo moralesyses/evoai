@@ -14,11 +14,42 @@ declare(strict_types=1);
 /** Unpaid sign-ups are cleared after this many hours (Maya checkouts expire after one). */
 const SIGNUP_KEEP_HOURS = 24;
 
+/**
+ * Someone who opens a member's 1EVOAI card signs up under that member: the card remembers its owner's
+ * main account in this browser (views/card.php), and Create Account uses it when the sign-up link has
+ * no ?ref= of its own (views/main.php, registration_request()). The last card opened counts.
+ */
+const SIGNUP_REF_COOKIE = 'evo_ref';
+const SIGNUP_REF_DAYS = 30;
+
+/** Remember $accountId (a card owner's main account, MMM-…) as this browser's referrer. */
+function signup_remember_referrer(string $accountId): void
+{
+    if (!preg_match('/^MMM-\d{5,7}$/', $accountId) || headers_sent() || ($_COOKIE[SIGNUP_REF_COOKIE] ?? '') === $accountId) {
+        return;
+    }
+    setcookie(SIGNUP_REF_COOKIE, $accountId, [
+        'expires' => time() + SIGNUP_REF_DAYS * 86400,
+        'path' => base_path() . '/',
+        'secure' => session_get_cookie_params()['secure'],
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    $_COOKIE[SIGNUP_REF_COOKIE] = $accountId;
+}
+
+/** The referrer remembered from a card, while that account is still in the team tree; '' otherwise. */
+function signup_remembered_referrer(): string
+{
+    $ref = is_string($_COOKIE[SIGNUP_REF_COOKIE] ?? null) ? strtoupper(trim($_COOKIE[SIGNUP_REF_COOKIE])) : '';
+    return preg_match('/^MMM-\d{5,7}$/', $ref) && db_value('SELECT 1 FROM mlm_genealogy WHERE id = ?', [$ref]) ? $ref : '';
+}
+
 /** Validate the form, store the sign-up and return Maya's payment page. */
 function signup_start(array $in): string
 {
     if (!maya_enabled()) {
-        throw new InvalidArgumentException('Online sign-up opens once membership payments are set up. Please contact the 88MMM administrator.');
+        throw new InvalidArgumentException(MAYA_UNAVAILABLE . '. Please sign up with an activation code and its PIN, or contact the 88MMM administrator.');
     }
     $reg = registration_request($in);
     $item = checkout_item($reg['package']);

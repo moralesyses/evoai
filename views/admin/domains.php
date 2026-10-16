@@ -236,7 +236,7 @@ $adBtn = 'px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zin
                     <?php endif; ?>
                     <?php foreach ($adSites as $w): ?>
                         <tr data-adom-site="<?= e($w['user_id']) ?>">
-                            <td class="py-2 pr-3"><span class="font-semibold text-white"><?= e($w['name']) ?></span><span class="block text-zinc-500 break-all"><?= e(site_live_url($w['user_id']) ?? 'no active domain') ?></span></td>
+                            <td class="py-2 pr-3"><span class="font-semibold text-white"><?= e($w['name']) ?></span><span class="block text-zinc-500 break-all"><?= e(site_live_url($w['user_id']) ?? site_portal_url($w['user_id'])) ?><?= site_has_domain($w['user_id']) ? '' : ' (no domain)' ?></span></td>
                             <td class="py-2 pr-3">
                                 <span class="<?= $adPill ?> <?= $w['status'] === 'suspended' ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' : ($w['status'] === 'published' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-zinc-900 border-zinc-700 text-zinc-400') ?>"><?= $w['status'] === 'suspended' ? 'Taken offline' : ($w['status'] === 'published' ? 'Live' : 'Draft') ?></span>
                                 <?php if ($w['admin_note'] !== ''): ?><span class="block text-rose-300 break-words"><?= e($w['admin_note']) ?></span><?php endif; ?>
@@ -256,7 +256,7 @@ $adBtn = 'px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zin
                 </tbody>
             </table>
         </div>
-        <p class="text-[10px] text-zinc-500">Members build their websites in Member Backoffice → My Website once they own a domain. A site taken offline can't be published again until you restore it; the member sees your reason.</p>
+        <p class="text-[10px] text-zinc-500">Every member can build a website in Member Backoffice → My Website. Without a domain it is at its portal address (shown above) and linked from their card; with one, also at their domain. A site taken offline can't be published again until you restore it; the member sees your reason.</p>
     </div>
 
     <div class="p-5 rounded-3xl bg-[#111111] border border-zinc-800 space-y-3">

@@ -203,4 +203,14 @@
         });
     });
   }
+
+  // Your own accounts (their rows' Backoffice button): make that one the Active Account, then open the Backoffice.
+  EVO.qsa('[data-us-open-account]', root).forEach(function (link) {
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      EVO.api('mlm.setActive', { accountId: link.getAttribute('data-us-open-account') })
+        .then(function () { window.location.href = link.href; })
+        .catch(function (err) { EVO.toast(err.message, 'error'); });
+    });
+  });
 })();

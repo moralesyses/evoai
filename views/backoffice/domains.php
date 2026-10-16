@@ -29,6 +29,10 @@ $domPill = 'text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wi
         <?php endif; ?>
     </div>
 
+    <?php if ($domState['paymentDriver'] === 'maya' && !maya_enabled()): ?>
+        <div class="p-3 rounded-2xl bg-amber-950/40 border border-amber-600/40 text-xs text-amber-200" role="note" data-dom-maya-off><?= e(MAYA_UNAVAILABLE) ?>, so domains can't be bought or renewed here yet. You can still search for a name.</div>
+    <?php endif; ?>
+
     <?php if ($domMissing): ?>
         <div class="p-3 rounded-2xl bg-amber-950/40 border border-amber-600/40 text-xs text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2" role="note">
             <span>A domain is registered in its owner's name. Please add your <?= e(implode(', ', $domMissing)) ?> in My Account before buying.</span>

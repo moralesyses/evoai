@@ -18,13 +18,14 @@ return [
     'site.publish' => static function (array $in): array {
         $user = api_user();
         $site = site_publish($user, is_array($in['site'] ?? null) ? $in['site'] : null);
-        $url = site_live_url($user['id']);
-        return ['site' => $site, 'liveUrl' => $url, 'message' => 'Your website is live' . ($url ? ' at ' . $url : '') . '.'];
+        $url = site_live_url($user['id']) ?? site_portal_url($user['id']); // the domain, or the portal address without one
+        return ['site' => $site, 'liveUrl' => $url, 'message' => 'Your website is live at ' . $url . '.'];
     },
 
     'site.unpublish' => static function (array $in): array {
-        site_unpublish(api_user());
-        return ['message' => 'Your website is taken down. Your domain shows your digital card again.'];
+        $user = api_user();
+        site_unpublish($user);
+        return ['message' => 'Your website is taken down.' . (site_has_domain($user['id']) ? ' Your domain shows your digital card again.' : ' Your card no longer links to it.')];
     },
 
     // Delete the website for good (draft, published copy and uploaded images). confirm: "DELETE".
@@ -34,6 +35,13 @@ return [
         }
         $images = site_delete(api_user());
         return ['message' => 'Your website was deleted' . ($images ? ' with its ' . $images . ' image' . ($images === 1 ? '' : 's') : '') . '.'];
+    },
+
+    // Replace the draft with one of the starting designs (the published site stays until the next Publish).
+    'site.design' => static function (array $in): array {
+        $key = str_in($in, 'design', 30);
+        $site = site_apply_design(api_user(), $key);
+        return ['site' => $site, 'message' => 'Started from the "' . SITE_DESIGNS[$key]['label'] . '" design. Change anything you like; your published website stays as it is until you publish.'];
     },
 
     // Start again from the card profile.

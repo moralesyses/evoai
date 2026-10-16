@@ -10,7 +10,7 @@ const MLM_COMPLAN_DEFAULTS = [
     'entryFee'            => 2000,
     'directReferralBonus' => 200,
     'pairingBonus'        => 300,
-    'maxPairsPerCycle'    => 8,
+    'maxPairsPerCycle'    => 10,
     'cyclesPerDay'        => 2,
 ];
 /** cms_settings key that holds the edited plan (kept by "Reset CMS"). */
@@ -42,17 +42,17 @@ function mlm_complan(bool $fresh = false): array
 function mlm_save_complan(array $admin, array $in): array
 {
     $rules = [
-        'directReferralBonus' => [0, 1000000, 'Direct referral bonus'],
-        'pairingBonus'        => [0, 1000000, 'Pairing bonus'],
-        'maxPairsPerCycle'    => [1, 1000, 'Pairs per cycle'],
-        'cyclesPerDay'        => [1, 2, 'Cycles per day'],
+        'directReferralBonus' => [0, 1000000, 'Referral bonus'],
+        'pairingBonus'        => [0, 1000000, 'Match bonus'],
+        'maxPairsPerCycle'    => [1, 1000, 'Matches per round'],
+        'cyclesPerDay'        => [1, 2, 'Rounds per day'],
     ];
     $values = [];
     $errors = [];
     foreach ($rules as $key => [$min, $max, $label]) {
         $raw = is_scalar($in[$key] ?? null) ? trim((string) $in[$key]) : '';
         if ($raw === '' || !preg_match('/^\d+$/', $raw) || (int) $raw < $min || (int) $raw > $max) {
-            $errors[$key] = $key === 'cyclesPerDay' ? 'Choose 1 or 2 cycles per day.' : $label . ' must be a whole number from ' . number_format($min) . ' to ' . number_format($max) . '.';
+            $errors[$key] = $key === 'cyclesPerDay' ? 'Choose 1 or 2 rounds per day.' : $label . ' must be a whole number from ' . number_format($min) . ' to ' . number_format($max) . '.';
             continue;
         }
         $values[$key] = (int) $raw;
@@ -63,7 +63,7 @@ function mlm_save_complan(array $admin, array $in): array
     db_run('INSERT INTO cms_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)',
         [MLM_COMPLAN_KEY, json_encode($values)]);
     $plan = mlm_complan(true);
-    add_audit(sprintf('Binary compensation plan updated: ₱%s direct referral, ₱%s pairing, %d pairs × %d cycle%s = %d pairs/day (max ₱%s/day)',
+    add_audit(sprintf('Rewards plan updated: ₱%s referral, ₱%s match, %d matches × %d round%s = %d matches/day (max ₱%s/day)',
         num($plan['directReferralBonus']), num($plan['pairingBonus']), $plan['maxPairsPerCycle'], $plan['cyclesPerDay'], $plan['cyclesPerDay'] === 1 ? '' : 's',
         $plan['pairsPerDay'], num($plan['maxDailyPairingIncome'])), $admin['id']);
     return [$plan, []];
@@ -73,18 +73,18 @@ function mlm_save_complan(array $admin, array $in): array
 function mlm_cycle_label(int $cycle): string
 {
     if (mlm_complan()['cyclesPerDay'] === 1) {
-        return 'Daily Cycle (12:00 AM – 11:59 PM)';
+        return 'Daily Round (12:00 AM – 11:59 PM)';
     }
-    return $cycle === 1 ? 'Cycle 1 (12:00 AM – 11:59 AM)' : 'Cycle 2 (12:00 PM – 11:59 PM)';
+    return $cycle === 1 ? 'Round 1 (12:00 AM – 11:59 AM)' : 'Round 2 (12:00 PM – 11:59 PM)';
 }
 const MLM_PAYOUT_METHODS = ['gcash', 'maya', 'bank_transfer', 'cheque'];
 /** Member Shop: the member's available MLM balance, or Maya Checkout (the only outside payment). */
-const MLM_SHOP_METHODS = ['balance' => 'Available MLM Balance', 'maya' => 'Maya'];
+const MLM_SHOP_METHODS = ['balance' => 'Available Wallet Balance', 'maya' => 'Maya'];
 const MLM_TAX_RATE = 0.10;
 const MLM_PROCESSING_FEE = 50;
 const MLM_MIN_ENCASHMENT = 500;
 // Where a new downline goes under a member: a leg, or the leg with fewer downlines (mlm_leg_placement).
-const MLM_PLACEMENTS = ['auto' => 'Auto: leg with fewer downlines', 'left' => 'Left leg', 'right' => 'Right leg'];
+const MLM_PLACEMENTS = ['auto' => 'Auto: team with fewer members', 'left' => 'Left team', 'right' => 'Right team'];
 
 /* ---------------------------------------------------------------------
  * Row mappers
@@ -145,6 +145,7 @@ function mlm_product_to_array(array $r): array
         'id' => $r['id'], 'name' => $r['name'], 'category' => $r['category'], 'price' => (float) $r['price'],
         'memberPrice' => (float) $r['member_price'], 'points' => (int) $r['points'], 'image' => media_url($r['image']),
         'description' => (string) $r['description'], 'stock' => (int) $r['stock'],
+        'active' => (bool) ($r['active'] ?? true),
     ];
 }
 
@@ -157,17 +158,19 @@ function mlm_roll_cycles(): void
     db_run('UPDATE mlm_accounts SET cycle1_pairs_today = 0, cycle2_pairs_today = 0, flush_count_today = 0, cycle_date = CURDATE() WHERE cycle_date IS NULL OR cycle_date < CURDATE()');
 }
 
-/** Accounts visible to the user: admins manage every head, members their own. */
+/**
+ * The user's own backoffice accounts (their multiple accounts), main one
+ * first. Members who signed up with this user's referral ID belong to their
+ * team tree, never here, and that goes for admins too: an admin opens a
+ * member's backoffice read-only from Management Admin → Users. A member with
+ * no account gets one; an admin user without one gets none (an empty list).
+ */
 function mlm_accounts_for_user(array $user): array
 {
     mlm_roll_cycles();
-    $rows = is_admin($user)
-        ? db_all('SELECT * FROM mlm_accounts ORDER BY (user_id = ?) DESC, created_at, id', [$user['id']])
-        : db_all('SELECT * FROM mlm_accounts WHERE user_id = ? ORDER BY head_number, id', [$user['id']]);
+    $rows = db_all('SELECT * FROM mlm_accounts WHERE user_id = ? ORDER BY head_number, id', [$user['id']]);
     if (!$rows && !is_admin($user)) {
-        $profile = get_member_profile($user['id']);
         mlm_provision_account($user['id'], $user['name'], $user['email'], 'MMM-88001', 'Mike Maranan', false);
-        unset($profile);
         $rows = db_all('SELECT * FROM mlm_accounts WHERE user_id = ? ORDER BY head_number, id', [$user['id']]);
     }
     return array_map('mlm_account_to_array', $rows);
@@ -180,11 +183,9 @@ function mlm_member_accounts(string $userId): array
     return array_map('mlm_account_to_array', db_all('SELECT * FROM mlm_accounts WHERE user_id = ? ORDER BY head_number, id', [$userId]));
 }
 
+/** Whether the account is one of the user's own (admins included: a referred member's account is not theirs). */
 function mlm_can_access_account(array $user, string $accountId): bool
 {
-    if (is_admin($user)) {
-        return (bool) db_value('SELECT 1 FROM mlm_accounts WHERE id = ?', [$accountId]);
-    }
     return (bool) db_value('SELECT 1 FROM mlm_accounts WHERE id = ? AND user_id = ?', [$accountId, $user['id']]);
 }
 
@@ -192,6 +193,9 @@ function mlm_can_access_account(array $user, string $accountId): bool
 function mlm_active_account(array $user): array
 {
     $accounts = mlm_accounts_for_user($user);
+    if (!$accounts) {
+        throw new InvalidArgumentException('You have no backoffice account.');
+    }
     $selected = $_SESSION['mlm_account'] ?? null;
     foreach ($accounts as $a) {
         if ($a['id'] === $selected) {
@@ -259,7 +263,7 @@ function mlm_provision_account(string $userId, string $name, string $email, stri
     [$placementId, $position] = mlm_signup_placement($sponsorId);
     mlm_join_binary($sponsorId, $id, $username, $name, $placementId, $position, false, $pay);
     db_run('INSERT INTO mlm_accounts (id, user_id, username, account_name, head_number, sponsor_id, sponsor_name, placement_id, leg_position, entry_date, cycle_date) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, CURDATE(), CURDATE())',
-        [$id, $userId, $username, $name . ' (Main Head)', $sponsorId, $sponsorName . ' (Sponsor)', $placementId, $position]);
+        [$id, $userId, $username, $name . ' (Main Account)', $sponsorId, $sponsorName . ' (Referrer)', $placementId, $position]);
     return $id;
 }
 
@@ -405,9 +409,10 @@ function mlm_codes(string $accountId): array
     return array_map('mlm_code_to_array', db_all('SELECT * FROM mlm_codes WHERE owner_account_id = ? ORDER BY serial DESC', [$accountId]));
 }
 
+/** The products members can buy (hidden ones are left out; Management Admin > Shop Products lists all). */
 function mlm_products(): array
 {
-    return array_map('mlm_product_to_array', db_all('SELECT * FROM mlm_products ORDER BY sort_order, name'));
+    return array_map('mlm_product_to_array', db_all('SELECT * FROM mlm_products WHERE active = 1 ORDER BY sort_order, name'));
 }
 
 function mlm_cart(string $accountId): array
@@ -511,7 +516,7 @@ function mlm_submit_encashment(array $account, array $in): array
     $method = str_in($in, 'payoutMethod', 20);
     $details = str_in($in, 'accountDetails', 190);
     if ($amount < MLM_MIN_ENCASHMENT) {
-        return ['success' => false, 'message' => 'Minimum encashment amount is Php 500.00'];
+        return ['success' => false, 'message' => 'Minimum withdrawal amount is Php 500.00'];
     }
     if (!in_array($method, MLM_PAYOUT_METHODS, true)) {
         return ['success' => false, 'message' => 'Please choose a payout channel.'];
@@ -534,12 +539,12 @@ function mlm_submit_encashment(array $account, array $in): array
         db_run('UPDATE mlm_accounts SET available_balance = available_balance - ?, total_encashment = total_encashment + ? WHERE id = ?', [$amount, $amount, $acc['id']]);
         db_run('INSERT INTO mlm_encashments (id, account_id, account_name, amount, gross_amount, tax_deduction, processing_fee, net_amount, payout_method, account_details, status, reference_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "pending", ?)',
             [$id, $acc['id'], $acc['accountName'], $amount, $amount, $tax, MLM_PROCESSING_FEE, $net, $method, $details, $ref]);
-        mlm_add_tx($acc['id'], 'encashment', 'Encashment Request via ' . $upper, $amount, 'out', 'pending', $ref,
+        mlm_add_tx($acc['id'], 'encashment', 'Withdrawal Request via ' . $upper, $amount, 'out', 'pending', $ref,
             sprintf('Net amount ₱%s to %s (10%% Tax: ₱%s, Fee: ₱50).', num($net), $details, num($tax)));
-        mlm_notify($acc['id'], 'Encashment Submitted: ₱' . num($amount) . ' PHP',
-            'Your encashment request for ₱' . num($amount) . ' is currently pending finance payout clearance.', 'encashment');
-        mlm_log($acc, 'Encashment Request: ₱' . num($amount) . ' (' . $upper . ')');
-        return ['success' => true, 'message' => 'Encashment request for ₱' . num($amount) . ' submitted successfully. Net: ₱' . num($net)];
+        mlm_notify($acc['id'], 'Withdrawal Submitted: ₱' . num($amount) . ' PHP',
+            'Your withdrawal request for ₱' . num($amount) . ' is currently pending finance payout clearance.', 'encashment');
+        mlm_log($acc, 'Withdrawal Request: ₱' . num($amount) . ' (' . $upper . ')');
+        return ['success' => true, 'message' => 'Withdrawal request for ₱' . num($amount) . ' submitted successfully. Net: ₱' . num($net)];
     });
 }
 
@@ -622,7 +627,7 @@ function mlm_register_downline(array $account, array $in): array
         return ['success' => false, 'message' => 'Choose where to place the new member: Auto, Left or Right.'];
     }
     if (!mlm_in_subtree($account['id'], $placementId)) {
-        return ['success' => false, 'message' => 'Placement must be inside your own binary genealogy.'];
+        return ['success' => false, 'message' => 'Placement must be inside your own team tree.'];
     }
 
     return db_tx(function () use ($account, $placementId, $choice, $username, $fullName, $codeIn, $pinIn) {
@@ -632,7 +637,7 @@ function mlm_register_downline(array $account, array $in): array
         }
         // The binary entry is the Executive package; a Chairman's Circle code is for a sign-up.
         if ($code['package'] !== 'membership_executive') {
-            return ['success' => false, 'message' => "This is a Chairman's Circle code. Downlines are placed with Executive codes; give this code to a new member to sign up with."];
+            return ['success' => false, 'message' => "This is a Chairman's Circle code. Team members are added with Executive codes; give this code to a new member to sign up with."];
         }
         if (db_value('SELECT 1 FROM mlm_genealogy WHERE username = ? UNION SELECT 1 FROM mlm_accounts WHERE username = ?', [$username, $username])) {
             return ['success' => false, 'message' => "Username @{$username} is already taken."];
@@ -644,11 +649,11 @@ function mlm_register_downline(array $account, array $in): array
 
         $names = array_column(db_all('SELECT id, full_name FROM mlm_genealogy WHERE id IN (?, ?)', [$placementId, $parentId]), 'full_name', 'id');
         $whose = $placementId === $account['id'] ? 'your' : ($names[$placementId] ?? $placementId) . '\'s';
-        $where = "on {$whose} " . strtoupper($leg) . ' leg' . ($choice === 'auto' ? ' (auto: fewer downlines)' : '')
+        $where = "on {$whose} " . strtoupper($leg) . ' team' . ($choice === 'auto' ? ' (auto: fewer members)' : '')
             . ', under ' . ($names[$parentId] ?? $parentId) . " ({$parentId}), {$position} slot";
         return [
             'success' => true,
-            'message' => "Downline {$fullName} successfully registered {$where}. Earned ₱{$direct} Direct Referral" . ($pairing > 0 ? " and ₱{$pairing} Pairing Match!" : '.'),
+            'message' => "Team member {$fullName} successfully added {$where}. Earned ₱{$direct} Referral Bonus" . ($pairing > 0 ? " and ₱{$pairing} Match Bonus!" : '.'),
             'newDownlineId' => $newId,
             'placementId' => $parentId,
             'position' => $position,
@@ -693,8 +698,8 @@ function mlm_signup_placement(string $sponsorId): array
 /** The sign-up form's line under the sponsor ID: where the new member will go. */
 function mlm_signup_placement_text(string $sponsorName, string $choice): string
 {
-    $leg = $choice === 'left' || $choice === 'right' ? "the {$choice} leg" : 'the leg with fewer downlines';
-    return "You'll join {$sponsorName}'s team on {$leg}.";
+    $leg = $choice === 'left' || $choice === 'right' ? "{$choice} team" : 'team with fewer members';
+    return "You'll join {$sponsorName}'s {$leg}.";
 }
 
 /** A member's choice of where sign-ups with their ID go (Backoffice > Network). */
@@ -705,19 +710,23 @@ function mlm_set_signup_placement(array $account, string $choice): array
     }
     db_run('UPDATE mlm_accounts SET signup_placement = ? WHERE id = ?', [$choice, $account['id']]);
     mlm_log($account, 'Sign-up placement set to ' . MLM_PLACEMENTS[$choice]);
-    $where = $choice === 'auto' ? 'on your leg with fewer downlines' : "on your {$choice} leg";
+    $where = $choice === 'auto' ? 'on your team with fewer members' : "on your {$choice} team";
     return ['success' => true, 'message' => "New members who sign up with your ID {$account['id']} will be placed {$where}.", 'placement' => $choice];
 }
 
 /**
  * Put a member into the binary tree under $placementId on $position and pay
- * the sponsor: the direct referral bonus, and a pairing bonus when the
- * sponsor's opposite leg has points (capped at the plan's pairs per cycle).
- * Volume (counts and points) goes to every upline node. Call inside db_tx().
+ * for it. Volume (counts and points) goes to every upline node, and every
+ * upline head whose opposite leg has a point waiting makes a pair: the
+ * pairing bonus within the plan's pairs per cycle; past it the pair is blocked
+ * and all that head's points are flushed to zero (₱0 binary_flush line)
+ * (mlm_add_point). Each head's counters start
+ * again on a new day as it is paid (mlm_lock_pair_counters). The sponsor also
+ * earns the direct referral bonus. Call inside db_tx().
  *
  * $nodeExists: the genealogy row is already there (an earlier sign-up being
  * placed); otherwise it is created. $pay = false places without commissions.
- * Returns ['direct' => ₱, 'pairing' => ₱, 'sponsorLeg' => 'left'|'right'].
+ * Returns ['direct' => ₱, 'pairing' => ₱ (the sponsor's), 'sponsorLeg' => 'left'|'right'].
  */
 function mlm_join_binary(string $sponsorId, string $newId, string $username, string $fullName, string $placementId, string $position, bool $nodeExists = false, bool $pay = true): array
 {
@@ -729,18 +738,29 @@ function mlm_join_binary(string $sponsorId, string $newId, string $username, str
             [$newId, $username, $fullName, $sponsorId, $placementId, $position, $level]);
     }
 
-    // Volume to every upline node; remember which of the sponsor's legs it landed on.
+    // Volume to every upline node, and a pair for each upline head with a point
+    // waiting on its other leg; remember which of the sponsor's legs it landed on.
+    $plan = mlm_complan();
     $sponsorLeg = null;
+    $sponsorPair = null;
     $childPos = $position;
     $parent = $placementId;
     $guard = 0;
     while ($parent && $guard++ < 500) {
         $col = $childPos === 'left' ? 'left' : 'right';
         db_run("UPDATE mlm_genealogy SET {$col}_count = {$col}_count + 1, {$col}_points = {$col}_points + 1 WHERE id = ?", [$parent]);
-        if ($parent !== $sponsorId) {
-            db_run("UPDATE mlm_accounts SET {$col}_count = {$col}_count + 1, {$col}_points = {$col}_points + 1 WHERE id = ?", [$parent]);
-        } else {
+        $pair = mlm_add_point($parent, $col, $pay);
+        if ($parent === $sponsorId) {
             $sponsorLeg = $childPos;
+            $sponsorPair = $pair; // paid out (or recorded as flushed) with the referral bonus below
+        } elseif ($pair && $pair['pairing'] > 0) {
+            $legUp = strtoupper($col);
+            mlm_add_tx($parent, 'binary_pairing', 'Match Bonus', $pair['pairing'], 'in', 'completed', 'PAIR-' . ms_tail(6),
+                "{$fullName} (@{$username}) joined your {$legUp} team: 1 Left : 1 Right match triggered @ Php " . num($plan['pairingBonus']) . '. Round ' . $pair['cycle'] . ' progress: ' . $pair['progress'] . '/' . $plan['maxPairsPerCycle'] . ' matches.', $fullName);
+            mlm_notify($parent, 'Team Match: +₱' . num($pair['pairing']) . ' PHP',
+                "{$fullName} joined your {$legUp} team and made a match. ₱" . num($pair['pairing']) . ' Match Bonus credited to your available balance.', 'pairing');
+        } elseif ($pair && $pair['flushed']) {
+            mlm_add_flush_tx($parent, $pair, "{$fullName} (@{$username}) joined your " . strtoupper($col) . ' team', $fullName);
         }
         $row = db_one('SELECT placement_id, position FROM mlm_genealogy WHERE id = ?', [$parent]);
         $childPos = $row['position'] ?? null;
@@ -766,42 +786,148 @@ function mlm_join_binary(string $sponsorId, string $newId, string $username, str
         return ['direct' => 0, 'pairing' => 0, 'sponsorLeg' => $sponsorLeg];
     }
     $acc = mlm_lock_account($sponsorId);
-    $plan = mlm_complan();
     $direct = $pay ? $plan['directReferralBonus'] : 0;
-    $cycle = mlm_current_cycle();
-    $cycleField = $cycle === 1 ? 'cycle1PairsToday' : 'cycle2PairsToday';
-    $opposite = $sponsorLeg === 'left' ? $acc['rightPoints'] : $acc['leftPoints'];
-    $pair = ($pay && $opposite > 0 && $acc[$cycleField] < $plan['maxPairsPerCycle']) ? 1 : 0;
-    $pairing = $pair * $plan['pairingBonus'];
+    // Its point and any pair were booked on the way up (mlm_add_point).
+    $pairing = $sponsorPair['pairing'] ?? 0;
     $credit = $direct + $pairing;
-    // A pair uses one point from each leg: the new member's and one waiting on the other side.
-    $left = $acc['leftPoints'] + ($sponsorLeg === 'left' ? 1 : 0) - $pair;
-    $right = $acc['rightPoints'] + ($sponsorLeg === 'right' ? 1 : 0) - $pair;
-    db_run("UPDATE mlm_accounts SET available_balance = available_balance + ?, total_income = total_income + ?, total_direct_bonus = total_direct_bonus + ?,
-            total_pairing_bonus = total_pairing_bonus + ?, sponsored_count = sponsored_count + 1,
-            left_count = left_count + ?, right_count = right_count + ?, left_points = ?, right_points = ?,
-            cycle{$cycle}_pairs_today = cycle{$cycle}_pairs_today + ? WHERE id = ?",
-        [$credit, $credit, $direct, $pairing, $sponsorLeg === 'left' ? 1 : 0, $sponsorLeg === 'right' ? 1 : 0, max(0, $left), max(0, $right), $pair, $acc['id']]);
-    // Keep the sponsor's genealogy node in step with its wallet volume (pair flush included).
-    db_run('UPDATE mlm_genealogy SET left_points = ?, right_points = ? WHERE id = ?', [max(0, $left), max(0, $right), $acc['id']]);
+    db_run('UPDATE mlm_accounts SET available_balance = available_balance + ?, total_income = total_income + ?, total_direct_bonus = total_direct_bonus + ?,
+            sponsored_count = sponsored_count + 1 WHERE id = ?',
+        [$direct, $direct, $direct, $acc['id']]);
 
     // The sponsor's leg the member landed in (a deep spot can be a left slot inside the right leg).
     $legUpper = strtoupper($sponsorLeg);
     if ($direct > 0) {
-        mlm_add_tx($acc['id'], 'direct_referral', 'Direct Referral Commission', $direct, 'in', 'completed', 'DIR-' . ms_tail(6),
-            "Sponsored {$fullName} (@{$username}) on {$legUpper} leg.", $fullName);
+        mlm_add_tx($acc['id'], 'direct_referral', 'Referral Bonus', $direct, 'in', 'completed', 'DIR-' . ms_tail(6),
+            "Referred {$fullName} (@{$username}) on {$legUpper} team.", $fullName);
     }
     if ($pairing > 0) {
         // Stamped 10ms later so it lists above the direct bonus, as in the reference.
-        mlm_add_tx($acc['id'], 'binary_pairing', 'Binary Pairing Match Bonus', $pairing, 'in', 'completed', 'PAIR-' . ms_tail(6),
-            '1 Left : 1 Right match triggered @ Php ' . num($plan['pairingBonus']) . '. Cycle ' . $cycle . ' progress: ' . ($acc[$cycleField] + 1) . '/' . $plan['maxPairsPerCycle'] . ' pairs.', null, 10);
+        mlm_add_tx($acc['id'], 'binary_pairing', 'Match Bonus', $pairing, 'in', 'completed', 'PAIR-' . ms_tail(6),
+            '1 Left : 1 Right match triggered @ Php ' . num($plan['pairingBonus']) . '. Round ' . $sponsorPair['cycle'] . ' progress: ' . $sponsorPair['progress'] . '/' . $plan['maxPairsPerCycle'] . ' matches.', null, 10);
+    } elseif (!empty($sponsorPair['flushed'])) {
+        mlm_add_flush_tx($acc['id'], $sponsorPair, "Referred {$fullName} (@{$username}) on {$legUpper} team", $fullName, 10);
     }
     if ($credit > 0) {
-        mlm_notify($acc['id'], 'New Downline Registered: ' . $fullName,
-            "Registered on {$legUpper} leg. Earned ₱" . num($direct) . ' Direct Bonus' . ($pairing > 0 ? ' + ₱' . num($pairing) . ' Pairing Match!' : '!'), 'bonus');
+        mlm_notify($acc['id'], 'New Team Member Added: ' . $fullName,
+            "Added on {$legUpper} team. Earned ₱" . num($direct) . ' Referral Bonus' . ($pairing > 0 ? ' + ₱' . num($pairing) . ' Match Bonus!' : '!'), 'bonus');
     }
-    mlm_log($acc, "Registered Downline @{$username} ({$fullName}) on {$legUpper} leg");
+    mlm_log($acc, "Added Team Member @{$username} ({$fullName}) on {$legUpper} team");
     return ['direct' => $direct, 'pairing' => $pairing, 'sponsorLeg' => $sponsorLeg];
+}
+
+/**
+ * A head's pair counters for today, locked: the stored ones, or zeros on a new
+ * day (mlm_roll_cycles() only runs when a backoffice page loads). Null for a
+ * node without a backoffice account. Call inside a transaction.
+ */
+function mlm_lock_pair_counters(string $id): ?array
+{
+    $row = db_one('SELECT left_points, right_points, cycle1_pairs_today, cycle2_pairs_today, flush_count_today, cycle_date FROM mlm_accounts WHERE id = ? FOR UPDATE', [$id]);
+    if (!$row) {
+        return null;
+    }
+    $today = $row['cycle_date'] !== null && (string) $row['cycle_date'] >= date('Y-m-d');
+    return [
+        'left' => (int) $row['left_points'], 'right' => (int) $row['right_points'],
+        1 => $today ? (int) $row['cycle1_pairs_today'] : 0, 2 => $today ? (int) $row['cycle2_pairs_today'] : 0,
+        'flush' => $today ? (int) $row['flush_count_today'] : 0,
+    ];
+}
+
+/** Store a head's points and today's pair counters, its genealogy node in step, and credit $bonus. */
+function mlm_save_pair_counters(string $id, array $c, float $bonus): void
+{
+    $left = max(0, $c['left']);
+    $right = max(0, $c['right']);
+    db_run('UPDATE mlm_accounts SET left_points = ?, right_points = ?, cycle1_pairs_today = ?, cycle2_pairs_today = ?, flush_count_today = ?, cycle_date = CURDATE(),
+            available_balance = available_balance + ?, total_income = total_income + ?, total_pairing_bonus = total_pairing_bonus + ? WHERE id = ?',
+        [$left, $right, $c[1], $c[2], $c['flush'], $bonus, $bonus, $bonus, $id]);
+    db_run('UPDATE mlm_genealogy SET left_points = ?, right_points = ? WHERE id = ?', [$left, $right, $id]);
+}
+
+/**
+ * A new member joined below head $id on its $leg: one more on that leg's count
+ * and points. When the other leg has a point waiting, the two make a pair:
+ * within the plan's pairs per cycle it pays the pairing bonus and one point
+ * leaves each leg. Past the limit the pair is blocked and the head is flushed:
+ * nothing is paid and ALL its points on both legs (the new one included) go to
+ * zero; counts are untouched (flush_count_today counts the flushes). With no
+ * point waiting on the other leg there is no pair: the new point just waits,
+ * also past the limit and across cycles. Call inside db_tx().
+ * Returns null for a node without a backoffice account, otherwise
+ * ['pairing' => ₱, 'flushed' => bool, 'wiped' => ['left' => n, 'right' => n],
+ *  'cycle' => 1|2, 'progress' => pairs paid this cycle].
+ */
+function mlm_add_point(string $id, string $leg, bool $pay = true): ?array
+{
+    $c = mlm_lock_pair_counters($id);
+    if ($c === null) {
+        return null;
+    }
+    $plan = mlm_complan();
+    $cycle = mlm_current_cycle();
+    $other = $leg === 'left' ? 'right' : 'left';
+    $pair = $pay && $c[$other] > 0;
+    $paid = $pair && $c[$cycle] < $plan['maxPairsPerCycle'];
+    $wiped = ['left' => 0, 'right' => 0];
+    $c[$leg]++;
+    if ($paid) {
+        $c[$leg]--;
+        $c[$other]--;
+        $c[$cycle]++;
+    } elseif ($pair) {
+        $wiped = ['left' => $c['left'], 'right' => $c['right']];
+        $c['left'] = 0;
+        $c['right'] = 0;
+        $c['flush']++;
+    }
+    $bonus = $paid ? $plan['pairingBonus'] : 0;
+    db_run("UPDATE mlm_accounts SET {$leg}_count = {$leg}_count + 1 WHERE id = ?", [$id]);
+    mlm_save_pair_counters($id, $c, $bonus);
+    return ['pairing' => $bonus, 'flushed' => $pair && !$paid, 'wiped' => $wiped, 'cycle' => $cycle, 'progress' => $c[$cycle]];
+}
+
+/** The ledger line for a flush (₱0, type binary_flush): the blocked pair and the points wiped on each side. */
+function mlm_add_flush_tx(string $accountId, array $pair, string $joined, string $source, int $offsetMs = 0): void
+{
+    $max = mlm_complan()['maxPairsPerCycle'];
+    $n = static fn (int $p): string => $p . ' point' . ($p === 1 ? '' : 's');
+    mlm_add_tx($accountId, 'binary_flush', 'Match Over Round Limit: Points Cleared', 0, 'in', 'completed', 'LIMIT-' . ms_tail(6),
+        "{$joined}: a 1 Left : 1 Right match past the Round {$pair['cycle']} limit ({$pair['progress']}/{$max} matches paid). No Match Bonus; all waiting points cleared: "
+        . $n($pair['wiped']['left']) . ' left, ' . $n($pair['wiped']['right']) . ' right (the new member\'s included).', $source, $offsetMs);
+}
+
+/**
+ * Pairs that waited under the old rule, when only the sponsor could pair: a
+ * head with points on both legs from members it didn't refer. Pays one
+ * pairing bonus per point pair, up to what is left of the head's current
+ * cycle; the rest keeps waiting. Returns one line per head. Call inside a transaction.
+ */
+function mlm_settle_waiting_matches(): array
+{
+    $plan = mlm_complan();
+    $cycle = mlm_current_cycle();
+    $done = [];
+    foreach (db_all('SELECT id, account_name FROM mlm_accounts WHERE left_points > 0 AND right_points > 0 ORDER BY id') as $r) {
+        $c = mlm_lock_pair_counters($r['id']);
+        $pairs = min($c['left'], $c['right'], max(0, $plan['maxPairsPerCycle'] - $c[$cycle]));
+        if ($pairs < 1) {
+            $done[] = sprintf('%s %s: %d:%d points waiting, round %d limit reached; try again next round', $r['id'], $r['account_name'], $c['left'], $c['right'], $cycle);
+            continue;
+        }
+        $c['left'] -= $pairs;
+        $c['right'] -= $pairs;
+        $c[$cycle] += $pairs;
+        $bonus = $pairs * $plan['pairingBonus'];
+        mlm_save_pair_counters($r['id'], $c, $bonus);
+        $s = $pairs === 1 ? '' : 'es';
+        mlm_add_tx($r['id'], 'binary_pairing', 'Match Bonus', $bonus, 'in', 'completed', 'PAIR-' . ms_tail(6),
+            "{$pairs} match{$s} from points already waiting on both teams @ Php " . num($plan['pairingBonus']) . ". Round {$cycle} progress: {$c[$cycle]}/{$plan['maxPairsPerCycle']} matches.");
+        mlm_notify($r['id'], 'Team Match: +₱' . num($bonus) . ' PHP',
+            "Points waiting on your left and right teams made {$pairs} match{$s}. ₱" . num($bonus) . ' Match Bonus credited to your available balance.', 'pairing');
+        $done[] = sprintf('%s %s: %d match%s, P%s; points now %d:%d', $r['id'], $r['account_name'], $pairs, $s, num($bonus), max(0, $c['left']), max(0, $c['right']));
+    }
+    return $done;
 }
 
 /**
@@ -843,31 +969,10 @@ function mlm_place_unplaced_signups(): array
         [$placementId, $position] = mlm_signup_placement($r['sponsor_id']);
         $paid = mlm_join_binary($r['sponsor_id'], $r['id'], $r['username'], $r['full_name'], $placementId, $position, true);
         db_run('UPDATE mlm_accounts SET placement_id = ?, leg_position = ? WHERE id = ?', [$placementId, $position, $r['id']]);
-        $done[] = sprintf('%s @%s -> under %s (%s); sponsor %s earned direct P%s, pairing P%s',
+        $done[] = sprintf('%s @%s -> under %s (%s); referrer %s earned referral P%s, match P%s',
             $r['id'], $r['username'], $placementId, $position, $r['sponsor_id'], num($paid['direct']), num($paid['pairing']));
     }
     return $done;
-}
-
-/** Credit one 1:1 pairing match (demo tool shown on the dashboard). */
-function mlm_simulate_pairing(array $account): array
-{
-    return db_tx(function () use ($account) {
-        $acc = mlm_lock_account($account['id']);
-        $cycle = mlm_current_cycle();
-        $field = $cycle === 1 ? 'cycle1PairsToday' : 'cycle2PairsToday';
-        if ($acc[$field] >= mlm_complan()['maxPairsPerCycle']) {
-            $max = mlm_complan()['maxPairsPerCycle'];
-            return ['success' => false, 'message' => 'Daily Cycle Safety Net reached! Max ' . $max . ' pair' . ($max === 1 ? '' : 's') . ' per cycle. Wait for next cycle reset.'];
-        }
-        $bonus = mlm_complan()['pairingBonus'];
-        db_run("UPDATE mlm_accounts SET available_balance = available_balance + ?, total_income = total_income + ?, total_pairing_bonus = total_pairing_bonus + ?, cycle{$cycle}_pairs_today = cycle{$cycle}_pairs_today + 1 WHERE id = ?",
-            [$bonus, $bonus, $bonus, $acc['id']]);
-        mlm_add_tx($acc['id'], 'binary_pairing', 'Binary Pairing Match Bonus', $bonus, 'in', 'completed', 'PAIR-' . ms_tail(6),
-            '1 Left : 1 Right pairing match. Cycle ' . $cycle . ' count: ' . ($acc[$field] + 1) . '/' . mlm_complan()['maxPairsPerCycle'] . ' pairs.');
-        mlm_notify($acc['id'], 'Binary Pair Match: +₱' . num($bonus) . ' PHP', 'Matched 1 pair (Left:Right) @ Php ' . num($bonus) . '. Credited to available balance.', 'pairing');
-        return ['success' => true, 'message' => 'Binary pair matched: +₱' . num($bonus) . ' credited to available balance.'];
-    });
 }
 
 /* ---------------------------------------------------------------------
@@ -875,9 +980,12 @@ function mlm_simulate_pairing(array $account): array
  * ------------------------------------------------------------------- */
 function mlm_cart_set(array $account, string $productId, int $qty, bool $add = false): void
 {
-    $product = db_one('SELECT id, stock FROM mlm_products WHERE id = ?', [$productId]);
+    $product = db_one('SELECT id, stock, active FROM mlm_products WHERE id = ?', [$productId]);
     if (!$product) {
         throw new InvalidArgumentException('Product not found.');
+    }
+    if (!$product['active'] && $qty > 0) {
+        throw new InvalidArgumentException('This product is no longer available.');
     }
     if ($add) {
         $qty += (int) db_value('SELECT quantity FROM mlm_cart_items WHERE account_id = ? AND product_id = ?', [$account['id'], $productId]);
@@ -905,6 +1013,9 @@ function mlm_cart_checkout_lines(string $accountId): array
     $total = 0.0;
     $points = 0;
     foreach ($cart as $line) {
+        if (!$line['product']['active']) {
+            throw new InvalidArgumentException($line['product']['name'] . ' is no longer available. Please remove it from your cart.');
+        }
         if ($line['quantity'] > $line['product']['stock']) {
             throw new InvalidArgumentException('Not enough stock for ' . $line['product']['name'] . '.');
         }
@@ -958,11 +1069,11 @@ function mlm_checkout_cart(array $account, string $methodKey, string $address): 
         [$cart, $total, $points] = mlm_cart_checkout_lines($account['id']);
         $acc = mlm_lock_account($account['id']);
         if ($acc['availableBalance'] < $total) {
-            throw new InvalidArgumentException('Insufficient MLM Available Balance');
+            throw new InvalidArgumentException('Insufficient wallet balance');
         }
         db_run('UPDATE mlm_accounts SET available_balance = available_balance - ? WHERE id = ?', [$total, $acc['id']]);
         mlm_add_tx($acc['id'], 'shop_purchase', '88MMM Member Shop Purchase', $total, 'out', 'completed', 'SHOP-' . ms_tail(6),
-            'Purchased ' . count($cart) . ' item(s) via MLM wallet balance.');
+            'Purchased ' . count($cart) . ' item(s) via wallet balance.');
         $method = MLM_SHOP_METHODS['balance'];
         [$orderId, $orderNumber] = mlm_write_order($account, $cart, $total, $points, $method, $address, 'paid');
         mlm_order_fulfil($orderId, $account['id']);
@@ -981,7 +1092,7 @@ function mlm_checkout_maya(array $account, array $user, string $address): string
 {
     $address = mlm_shop_address($address);
     if (!maya_enabled()) {
-        throw new InvalidArgumentException('Paying with Maya isn\'t available yet. Pay with your MLM balance, or contact the 88MMM administrator.');
+        throw new InvalidArgumentException(MAYA_UNAVAILABLE . '. Pay with your wallet balance, or contact the 88MMM administrator.');
     }
     [$orderId, $orderNumber, $total] = db_tx(function () use ($account, $address) {
         [$cart, $total, $points] = mlm_cart_checkout_lines($account['id']);

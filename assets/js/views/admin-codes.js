@@ -173,6 +173,8 @@
           q: logs.getAttribute('data-filter-q'),
           status: logs.getAttribute('data-filter-status'),
           package: logs.getAttribute('data-filter-package'),
+          from: logs.getAttribute('data-filter-from'),
+          to: logs.getAttribute('data-filter-to'),
         },
       };
     }

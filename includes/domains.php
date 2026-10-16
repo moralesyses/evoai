@@ -584,6 +584,10 @@ function domain_check_drivers(PaymentClient $pay, RegistrarClient $registrar): v
  */
 function domain_create_order(array $user, string $kind, string $target, ?float $expected = null): array
 {
+    // Before anything else: without Maya keys the checkout would only fail later, with a "try again" message.
+    if (payment_client()->name() === 'maya' && !maya_enabled()) {
+        throw new InvalidArgumentException(MAYA_UNAVAILABLE . ', so domains can\'t be bought or renewed here yet. Nothing was charged.');
+    }
     $price = domain_price($kind);
     $priceNote = $kind === 'renew' ? 'Renewal cost' : '';
     try {

@@ -5,8 +5,8 @@
  *
  * Maya is the only way to pay: the customer goes to Maya Checkout's hosted
  * page (includes/maya.php), where card and wallet details are typed. Without
- * Maya keys (maya.public_key / secret_key) the portal says online payment
- * isn't available yet and nothing can be paid.
+ * Maya keys (maya.public_key / secret_key) the portal says online checkout
+ * is still unavailable (MAYA_UNAVAILABLE) and nothing can be paid.
  * Expects: $user (array|null). Optional: $checkoutInvoice (pending invoice array).
  */
 $ckCms = get_cms();
@@ -86,7 +86,7 @@ $ckReceiptInput = 'w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-80
                             </div>
                         </div>
                     <?php else: ?>
-                        <p class="text-[11px] text-amber-200 bg-amber-950/40 border border-amber-600/40 p-3 rounded-xl" data-ck-unavailable>Online payment isn’t available yet: Maya Checkout hasn’t been set up. Please contact the 88MMM administrator.</p>
+                        <p class="text-[11px] text-amber-200 bg-amber-950/40 border border-amber-600/40 p-3 rounded-xl" data-ck-unavailable><?= e(MAYA_UNAVAILABLE) ?>. Please contact the 88MMM administrator.</p>
                     <?php endif; ?>
                 </div>
             </div>

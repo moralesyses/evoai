@@ -3,7 +3,9 @@
  * Front controller.
  *
  *   index.php?view=main        Main Portal (landing, sign-in, registration)
- *   index.php?view=card        1EVOAI public digital card (?profile=usr_x or ?card=slug)
+ *   /<link name>               1EVOAI public digital card, e.g. /juan-dela-cruz (.htaccess:
+ *                              index.php?card=<link name>); ?view=card&profile=usr_x and
+ *                              ?card=… redirect there (views/card.php)
  *   index.php?view=backoffice  Member Backoffice (signed-in members)
  *   index.php?view=admin       Management Admin (admin role)
  *   index.php?view=chat        E2EE Chat (signed-in members)

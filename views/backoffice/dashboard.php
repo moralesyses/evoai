@@ -26,7 +26,7 @@ $bdToday = $complan['cyclesPerDay'] > 1 ? $bdC1 + $bdC2 : $bdC1;
 $bdCardId = $profile['nfcCardId'] ?: 'MMC-VIP-88001';
 $bdTaps = (int) ($profile['metrics']['taps'] ?? 0) ?: 3840;
 $bdFrozen = ($profile['membershipStatus'] ?? '') === 'Frozen (Card Lost)';
-$bdSlug = domain_card_domain($user['id']) ?? ($profile['customSlug'] ?: ('1evoai.com/' . str_replace('usr_', '', $user['id']))); // their own .com domain when the card uses one
+$bdSlug = domain_card_domain($user['id']) ?? preg_replace('#^https?://#', '', card_share_url($profile, false)); // their own .com domain when the card uses one
 $bdAction = $profile['nfcAction'] ?? 'card';
 $bdTapDest = $bdAction === 'vcard'
     ? 'Direct vCard Address Book Download'
@@ -65,7 +65,7 @@ $bdChannelOff = 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-whi
                     <?= icon('wallet', 'w-3.5 h-3.5') ?>
                     Executive Payout Request
                 </div>
-                <h3 id="bo-encash-title" class="text-xl font-bold text-white">Member Encashment</h3>
+                <h3 id="bo-encash-title" class="text-xl font-bold text-white">Member Withdrawal</h3>
                 <p class="text-xs text-zinc-400 mt-0.5">Current Available Balance: <strong class="text-[#ffda72] font-mono"><?= peso($bdBalance) ?> PHP</strong></p>
             </div>
             <div data-bo-encash-success hidden class="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs text-center space-y-2">
@@ -129,24 +129,20 @@ $bdChannelOff = 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-whi
             <div>
                 <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#f3bd35]/15 border border-[#f3bd35]/30 text-[#ffda72] text-[10px] font-extrabold uppercase tracking-widest mb-1.5">
                     <?= icon('zap', 'w-3.5 h-3.5 text-[#f3bd35]') ?>
-                    Official 88MMM Binary Complan Rules
+                    Official 88MMM Rewards Plan Rules
                 </div>
                 <h2 class="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-                    Binary Compensation Engine
+                    Two-Team Rewards Engine
                     <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">Active &amp; Matching</span>
                 </h2>
                 <p class="text-xs text-zinc-300 mt-1 max-w-2xl leading-relaxed">
-                    Entry: <strong class="text-[#ffda72]">₱<?= num($complan['entryFee']) ?> PHP</strong> · Direct Referral: <strong class="text-emerald-400">₱<?= num($complan['directReferralBonus']) ?> PHP</strong> · Pairing Match: <strong class="text-[#f3bd35]">₱<?= num($complan['pairingBonus']) ?> PHP</strong> · Max Safety Net: <strong class="text-white"><?= $complan['maxPairsPerCycle'] ?> pairs/cycle (<?= $complan['cyclesPerDay'] ?> cycle<?= $complan['cyclesPerDay'] === 1 ? '' : 's' ?>/day = ₱<?= num($complan['maxDailyPairingIncome']) ?>/day max)</strong>.
+                    Entry: <strong class="text-[#ffda72]">₱<?= num($complan['entryFee']) ?> PHP</strong> · Referral Bonus: <strong class="text-emerald-400">₱<?= num($complan['directReferralBonus']) ?> PHP</strong> · Match Bonus: <strong class="text-[#f3bd35]">₱<?= num($complan['pairingBonus']) ?> PHP</strong> · Round Cap: <strong class="text-white"><?= $complan['maxPairsPerCycle'] ?> matches/round (<?= $complan['cyclesPerDay'] ?> round<?= $complan['cyclesPerDay'] === 1 ? '' : 's' ?>/day = ₱<?= num($complan['maxDailyPairingIncome']) ?>/day max)</strong>.
                 </p>
             </div>
             <div class="flex items-center gap-2.5 flex-wrap">
-                <button type="button" data-bo-simulate-pair title="Test real-time pairing match calculation" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#f3bd35] to-[#d89f1f] text-black font-extrabold text-xs shadow hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5">
-                    <?= icon('zap', 'w-3.5 h-3.5 text-black') ?>
-                    <span>Simulate Pair (+₱<?= num($bdPair) ?>)</span>
-                </button>
                 <button type="button" data-open-modal="bo-encash" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-extrabold text-xs shadow-lg active:scale-95 transition-all flex items-center gap-1.5">
                     <?= icon('wallet', 'w-3.5 h-3.5') ?>
-                    <span>Request Encashment</span>
+                    <span>Request Withdrawal</span>
                 </button>
             </div>
         </div>
@@ -161,7 +157,7 @@ $bdChannelOff = 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-whi
             </div>
             <div class="text-3xl font-black text-white font-mono tabular-nums tracking-tight"><?= peso($account['availableBalance']) ?></div>
             <div class="mt-3 flex items-center justify-between text-[11px]">
-                <span class="text-emerald-400 font-semibold flex items-center gap-1"><?= icon('shield-check', 'w-3.5 h-3.5') ?> Ready for Encashment</span>
+                <span class="text-emerald-400 font-semibold flex items-center gap-1"><?= icon('shield-check', 'w-3.5 h-3.5') ?> Ready for Withdrawal</span>
                 <button type="button" data-open-modal="bo-encash" class="text-[#ffda72] hover:underline font-bold">Withdraw →</button>
             </div>
         </div>
@@ -171,23 +167,23 @@ $bdChannelOff = 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-whi
                 <div class="w-8 h-8 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center"><?= icon('trending-up', 'w-4 h-4') ?></div>
             </div>
             <div class="text-3xl font-black text-white font-mono tabular-nums tracking-tight"><?= peso($account['totalIncome']) ?></div>
-            <div class="mt-3 text-[11px] text-zinc-400">Total Encashed: <strong class="text-zinc-200"><?= peso($account['totalEncashment']) ?></strong></div>
+            <div class="mt-3 text-[11px] text-zinc-400">Total Withdrawn: <strong class="text-zinc-200"><?= peso($account['totalEncashment']) ?></strong></div>
         </div>
         <div class="p-5 rounded-3xl bg-[#121212] border border-zinc-800 shadow-xl">
             <div class="flex items-center justify-between text-zinc-400 text-xs font-semibold mb-2">
-                <span>Binary Pairing Bonus</span>
+                <span>Match Bonus</span>
                 <div class="w-8 h-8 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center"><?= icon('layers', 'w-4 h-4') ?></div>
             </div>
             <div class="text-3xl font-black text-[#ffda72] font-mono tabular-nums tracking-tight"><?= peso($account['totalPairingBonus']) ?></div>
-            <div class="mt-3 text-[11px] text-zinc-400">Matched pairs @ ₱<?= num($bdPair) ?> per pair</div>
+            <div class="mt-3 text-[11px] text-zinc-400">Team matches @ ₱<?= num($bdPair) ?> per match</div>
         </div>
         <div class="p-5 rounded-3xl bg-[#121212] border border-zinc-800 shadow-xl">
             <div class="flex items-center justify-between text-zinc-400 text-xs font-semibold mb-2">
-                <span>Direct Referral Bonus</span>
+                <span>Referral Bonus</span>
                 <div class="w-8 h-8 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center"><?= icon('users', 'w-4 h-4') ?></div>
             </div>
             <div class="text-3xl font-black text-white font-mono tabular-nums tracking-tight"><?= peso($account['totalDirectBonus']) ?></div>
-            <div class="mt-3 text-[11px] text-zinc-400"><?= e($account['sponsoredCount']) ?> sponsored members @ ₱<?= num($complan['directReferralBonus']) ?> each</div>
+            <div class="mt-3 text-[11px] text-zinc-400"><?= e($account['sponsoredCount']) ?> referred members @ ₱<?= num($complan['directReferralBonus']) ?> each</div>
         </div>
     </div>
 
@@ -196,24 +192,24 @@ $bdChannelOff = 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-whi
             <div>
                 <h3 class="text-base font-bold text-white flex items-center gap-2">
                     <?= icon('clock', 'w-4 h-4 text-[#f3bd35]') ?>
-                    Daily Binary Cycles &amp; Safety Net Progress
+                    Daily Match Rounds &amp; Cap Progress
                 </h3>
-                <p class="text-xs text-zinc-400 mt-0.5">Strict <?= $complan['maxPairsPerCycle'] ?> pairs maximum per cycle (<?= $complan['cyclesPerDay'] ?> cycle<?= $complan['cyclesPerDay'] === 1 ? '' : 's' ?> / 24h). Maximum daily payout: ₱<?= number_format($complan['maxDailyPairingIncome'], 2) ?> PHP.</p>
+                <p class="text-xs text-zinc-400 mt-0.5">Strict <?= $complan['maxPairsPerCycle'] ?> matches maximum per round (<?= $complan['cyclesPerDay'] ?> round<?= $complan['cyclesPerDay'] === 1 ? '' : 's' ?> / 24h). Maximum daily payout: ₱<?= number_format($complan['maxDailyPairingIncome'], 2) ?> PHP.</p>
             </div>
-            <span class="text-[11px] text-zinc-300 font-mono bg-zinc-900 border border-zinc-700 px-3 py-1 rounded-full self-start sm:self-auto">Today's Total: <?= $bdToday ?> / <?= $complan['pairsPerDay'] ?> pairs</span>
+            <span class="text-[11px] text-zinc-300 font-mono bg-zinc-900 border border-zinc-700 px-3 py-1 rounded-full self-start sm:self-auto">Today's Total: <?= $bdToday ?> / <?= $complan['pairsPerDay'] ?> matches</span>
         </div>
         <div class="grid grid-cols-1 <?= count($bdCycles) > 1 ? 'md:grid-cols-2' : '' ?> gap-4 pt-1">
             <?php foreach ($bdCycles as [$bdN, $bdCount, $bdPct, $bdText, $bdBar]): ?>
                 <div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-2">
                     <div class="flex items-center justify-between text-xs">
                         <span class="font-bold text-white"><?= e(mlm_cycle_label($bdN)) ?></span>
-                        <span class="<?= $bdText ?> font-mono font-bold"><?= $bdCount ?> / <?= $complan['maxPairsPerCycle'] ?> pairs (₱<?= num($bdCount * $bdPair) ?>)</span>
+                        <span class="<?= $bdText ?> font-mono font-bold"><?= $bdCount ?> / <?= $complan['maxPairsPerCycle'] ?> matches (₱<?= num($bdCount * $bdPair) ?>)</span>
                     </div>
-                    <div class="w-full h-3 bg-zinc-800 rounded-full overflow-hidden p-0.5" role="progressbar" aria-label="Cycle <?= $bdN ?> pairs" aria-valuemin="0" aria-valuemax="<?= $complan['maxPairsPerCycle'] ?>" aria-valuenow="<?= $bdCount ?>">
+                    <div class="w-full h-3 bg-zinc-800 rounded-full overflow-hidden p-0.5" role="progressbar" aria-label="Round <?= $bdN ?> matches" aria-valuemin="0" aria-valuemax="<?= $complan['maxPairsPerCycle'] ?>" aria-valuenow="<?= $bdCount ?>">
                         <div class="h-full bg-gradient-to-r <?= $bdBar ?> rounded-full transition-all duration-500" style="width: <?= $bdPct ?>%"></div>
                     </div>
                     <div class="flex items-center justify-between text-[10px] text-zinc-400">
-                        <span><?= max(0, $complan['maxPairsPerCycle'] - $bdCount) ?> pairs remaining</span>
+                        <span><?= max(0, $complan['maxPairsPerCycle'] - $bdCount) ?> matches remaining</span>
                         <span class="text-emerald-400 font-semibold">Max Cap: ₱<?= num($complan['maxCyclePairingIncome']) ?></span>
                     </div>
                 </div>
@@ -252,16 +248,16 @@ $bdChannelOff = 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-whi
                 <span class="text-xs uppercase font-bold text-blue-400 tracking-wider">Left Team Volume</span>
                 <span class="text-xs font-mono bg-blue-500/10 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30"><?= e($account['leftCount']) ?> Members</span>
             </div>
-            <div class="text-3xl font-black text-white font-mono tabular-nums"><?= e($account['leftPoints']) ?> <span class="text-sm font-normal text-zinc-400">PV Points</span></div>
-            <p class="text-xs text-zinc-400 mt-2">Strong leg accumulated point volume awaiting matching on right team.</p>
+            <div class="text-3xl font-black text-white font-mono tabular-nums"><?= e($account['leftPoints']) ?> <span class="text-sm font-normal text-zinc-400">Points</span></div>
+            <p class="text-xs text-zinc-400 mt-2">Stronger team accumulated point volume awaiting matching on right team.</p>
         </div>
         <div class="p-5 rounded-3xl bg-[#121212] border border-amber-500/20 shadow-xl">
             <div class="flex items-center justify-between mb-3">
                 <span class="text-xs uppercase font-bold text-amber-400 tracking-wider">Right Team Volume</span>
                 <span class="text-xs font-mono bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30"><?= e($account['rightCount']) ?> Members</span>
             </div>
-            <div class="text-3xl font-black text-white font-mono tabular-nums"><?= e($account['rightPoints']) ?> <span class="text-sm font-normal text-zinc-400">PV Points</span></div>
-            <p class="text-xs text-zinc-400 mt-2">Pay leg point volume. New member placement here triggers instant ₱<?= num($bdPair) ?> match!</p>
+            <div class="text-3xl font-black text-white font-mono tabular-nums"><?= e($account['rightPoints']) ?> <span class="text-sm font-normal text-zinc-400">Points</span></div>
+            <p class="text-xs text-zinc-400 mt-2">Matching team point volume. New member placement here triggers instant ₱<?= num($bdPair) ?> match!</p>
         </div>
     </div>
 
@@ -270,7 +266,7 @@ $bdChannelOff = 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-whi
             <div class="flex items-center justify-between">
                 <h3 class="text-base font-bold text-white flex items-center gap-2">
                     <?= icon('trending-up', 'w-4 h-4 text-[#f3bd35]') ?>
-                    Recent Binary Commissions &amp; Transactions
+                    Recent Rewards &amp; Transactions
                 </h3>
                 <button type="button" data-bo-view-ledger class="text-xs text-[#f3bd35] hover:underline font-semibold flex items-center gap-1">
                     <span>View Full Ledger</span>

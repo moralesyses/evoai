@@ -4,6 +4,8 @@
  * - tree cards open / fold the member's downlines below them (deeper levels
  *   load on demand, mlm.genealogyChildren); the eye icon and list rows open
  *   the details modal
+ * - the tree is a canvas: drag it with the mouse to move around (touch
+ *   screens scroll it natively); "Center" brings the root head back
  * - "Register Downline" (under the head) and free tree slots (under that
  *   member) open the registration modal, where the member picks Auto (the
  *   leg with fewer downlines), Left or Right (mlm.registerDownline)
@@ -37,8 +39,8 @@
     set('handle', '@' + n.username + ' · ' + n.id);
     set('package', n.package);
     set('position', n.position || 'ROOT');
-    set('leftPoints', n.leftPoints + ' PV');
-    set('rightPoints', n.rightPoints + ' PV');
+    set('leftPoints', n.leftPoints + ' pts');
+    set('rightPoints', n.rightPoints + ' pts');
     set('entryDate', n.entryDate);
     set('status', n.status);
     EVO.openModal('bo-net-node');
@@ -71,12 +73,12 @@
     return (
       html +
       '<div data-net-node="' + esc(node.id) + '" data-net-expand="' + esc(node.id) + '" aria-expanded="false" role="button" tabindex="0" title="' +
-      (below ? 'Show ' + esc(firstName(node.fullName)) + '’s downlines' : 'No downlines yet') +
+      (below ? 'Show ' + esc(firstName(node.fullName)) + '’s team members' : 'No team members yet') +
       '" class="relative cursor-pointer p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-700 text-center w-24 text-[10px]">' +
       '<button type="button" data-net-info="' + esc(node.id) + '" title="Member details" aria-label="Details of ' + esc(node.fullName) + '" class="absolute top-0 right-1 p-0.5 text-zinc-600 hover:text-white">' + EVO.icon('eye', 'w-3 h-3') + '</button>' +
       '<div class="font-bold text-white truncate">' + esc(firstName(node.fullName)) + '</div>' +
       '<div class="text-[8px] text-zinc-500 font-mono">' + esc(node.id) + '</div>' +
-      '<div class="text-[8px] mt-0.5 ' + (below ? 'text-[#f3bd35]' : 'text-zinc-600') + '" data-net-below>' + (below ? '▾ ' + below + ' below' : 'No downlines') + '</div>' +
+      '<div class="text-[8px] mt-0.5 ' + (below ? 'text-[#f3bd35]' : 'text-zinc-600') + '" data-net-below>' + (below ? '▾ ' + below + ' below' : 'No team members') + '</div>' +
       '</div>' +
       '<div data-net-sub="' + esc(node.id) + '" class="relative flex justify-center" style="padding-top:14px" hidden></div>' +
       '</div>'
@@ -155,21 +157,21 @@
     var leg = auto ? autoLeg() : placement.choice;
     var downlines = function (side) {
       var count = legCount(side);
-      return count ? count + (count === 1 ? ' downline' : ' downlines') : 'empty';
+      return count ? count + (count === 1 ? ' member' : ' members') : 'empty';
     };
     EVO.qsa('option', choiceSel).forEach(function (opt) {
       opt.textContent =
         opt.value === 'auto'
-          ? 'Auto: ' + autoLeg() + ' leg (' + (legCount('left') === legCount('right') ? 'tie, left first' : 'fewer downlines') + ')'
-          : (opt.value === 'left' ? 'Left' : 'Right') + ' leg · ' + downlines(opt.value);
+          ? 'Auto: ' + autoLeg() + ' team (' + (legCount('left') === legCount('right') ? 'tie, left first' : 'fewer members') + ')'
+          : (opt.value === 'left' ? 'Left' : 'Right') + ' team · ' + downlines(opt.value);
     });
     choiceSel.value = placement.choice;
     reg.querySelector('[data-reg-node]').textContent = name + ' (' + placement.id + ')';
-    reg.querySelector('[data-reg-leg]').textContent = leg + ' leg' + (auto ? ' (auto)' : '');
+    reg.querySelector('[data-reg-leg]').textContent = leg + ' team' + (auto ? ' (auto)' : '');
     var hint = legCount(leg)
-      ? 'Goes to the first free spot in ' + name + '’s ' + leg + ' leg, level by level, left first.'
+      ? 'Goes to the first free spot in ' + name + '’s ' + leg + ' team, level by level, left first.'
       : 'Goes straight into ' + name + '’s empty ' + leg + ' slot.';
-    if (auto) hint = 'Auto picks the leg with fewer downlines (left on a tie), now the ' + leg + ' leg. ' + hint;
+    if (auto) hint = 'Auto picks the team with fewer members (left on a tie), now the ' + leg + ' team. ' + hint;
     form.querySelector('[data-reg-hint]').textContent = hint;
   }
 
@@ -206,7 +208,7 @@
       }
       busy = true;
       setError('');
-      var restore = EVO.busy(submit, 'Enrolling &amp; Awarding Commissions...');
+      var restore = EVO.busy(submit, 'Adding &amp; Awarding Rewards...');
       EVO.api('mlm.registerDownline', {
         placementId: placement.id,
         position: placement.choice,
@@ -316,10 +318,85 @@
     if (right) right.toggleAttribute('hidden', nowOpen);
   }
 
+  /* ---------------- Genealogy tree: drag with the mouse to move around ---------------- */
+  // Touch screens already scroll the canvas with a finger; the mouse drags it.
+  // A press only becomes a drag once it moves a few pixels, so clicks on members still work.
+  var canvas = wrap.querySelector('[data-net-tree]');
+  var drag = null;
+  var dragged = false; // the last press moved the tree: the click that follows doesn't open a member
+  if (canvas) {
+    canvas.addEventListener('pointerdown', function (ev) {
+      if (ev.pointerType !== 'mouse' || ev.button !== 0) return;
+      drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, left: canvas.scrollLeft, top: canvas.scrollTop, moving: false };
+      dragged = false;
+    });
+    canvas.addEventListener('pointermove', function (ev) {
+      if (!drag || ev.pointerId !== drag.id) return;
+      var dx = ev.clientX - drag.x;
+      var dy = ev.clientY - drag.y;
+      if (!drag.moving) {
+        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+        drag.moving = true;
+        canvas.setPointerCapture(drag.id);
+        canvas.classList.add('is-dragging');
+      }
+      ev.preventDefault();
+      canvas.scrollLeft = drag.left - dx;
+      canvas.scrollTop = drag.top - dy;
+    });
+    var endDrag = function (ev) {
+      if (!drag || ev.pointerId !== drag.id) return;
+      if (drag.moving) {
+        dragged = true;
+        canvas.classList.remove('is-dragging');
+        if (canvas.hasPointerCapture(drag.id)) canvas.releasePointerCapture(drag.id);
+        setTimeout(function () {
+          dragged = false;
+        }, 0);
+      }
+      drag = null;
+    };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('click', function (ev) {
+      if (!dragged) return;
+      dragged = false;
+      ev.preventDefault();
+      ev.stopPropagation();
+    }, true);
+    // No "ghost image" drags of icons or text.
+    canvas.addEventListener('dragstart', function (ev) {
+      ev.preventDefault();
+    });
+  }
+
+  // Put the root head in the middle (also when the tree first becomes visible, and with "Center").
+  var centered = false;
+  function centerTree(smooth) {
+    var root = canvas && canvas.querySelector('[data-net-root]');
+    if (!root || !canvas.clientWidth) return false;
+    var c = canvas.getBoundingClientRect();
+    var r = root.getBoundingClientRect();
+    var left = canvas.scrollLeft + (r.left - c.left) - (canvas.clientWidth - r.width) / 2;
+    canvas.scrollTo({ left: Math.max(0, left), top: 0, behavior: smooth ? 'smooth' : 'auto' });
+    return true;
+  }
+  if (canvas) {
+    centered = centerTree(false);
+    document.addEventListener('evo:tab', function () {
+      if (!centered) centered = centerTree(false);
+    });
+  }
+
   /* ---------------- Delegated events ---------------- */
   document.addEventListener('click', function (ev) {
     var t = ev.target;
     if (!t.closest) return;
+
+    if (t.closest('[data-net-center]') && wrap.contains(t)) {
+      centerTree(true);
+      return;
+    }
 
     var go = t.closest('[data-net-goto]');
     if (go && wrap.contains(go)) {

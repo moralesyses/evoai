@@ -16,7 +16,7 @@ return [
         return [
             'saved' => true,
             'plan' => $plan,
-            'message' => sprintf('Binary plan saved: ₱%s direct referral, ₱%s per pair, %d pairs per day (max ₱%s/day).',
+            'message' => sprintf('Rewards plan saved: ₱%s referral bonus, ₱%s per match, %d matches per day (max ₱%s/day).',
                 num($plan['directReferralBonus']), num($plan['pairingBonus']), $plan['pairsPerDay'], num($plan['maxDailyPairingIncome'])),
         ];
     },

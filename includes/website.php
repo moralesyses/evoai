@@ -1,12 +1,16 @@
 <?php
 /**
- * Members' websites. Once a member owns an active .com domain, Member
+ * Members' websites. Every member builds a one-page site in Member
  * Backoffice > My Website (views/backoffice/website.php,
- * assets/js/views/bo-website.js) lets them build a one-page site from
- * sections, pick a theme and publish it. Visitors of their domain then see
- * the site (views/site.php) and the 1EVOAI card moves to
- * yourname.com/?view=card. Messages from the site's contact form go to the
- * member's Contacts (source "My website").
+ * assets/js/views/bo-website.js): sections, a theme, then Publish. The
+ * published site (views/site.php) is at its portal address
+ * (index.php?view=site&u=usr_x), linked from the member's card ("Visit my
+ * website"). A member who owns an active .com domain also gets it at the
+ * domain, and their 1EVOAI card moves to yourname.com/?view=card.
+ * Messages from the site's contact form go to the member's Contacts
+ * (source "My website"). The Shop section sells the
+ * member's products (Backoffice > My Products) with Maya, as their card does
+ * (includes/cards.php).
  *
  * A site is ['settings' => [...], 'sections' => [['id', 'type', 'hidden',
  * 'data' => [...]]]]. site_sanitize() keeps only known fields, limits their
@@ -15,7 +19,7 @@
  */
 declare(strict_types=1);
 
-const SITE_MAX_SECTIONS = 20;
+const SITE_MAX_SECTIONS = 30;
 /** Largest saved site (JSON bytes). */
 const SITE_MAX_BYTES = 200000;
 const SITE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
@@ -45,12 +49,17 @@ const SITE_FONTS = [
  * The editable fields: the site settings and each section type. A field is
  * ['type' => text|textarea|link|image|video|bool|select|color|list, 'label',
  * 'max' (characters), 'options' (select), 'fields' + 'maxItems' (list), 'help'].
- * The builder draws its forms from this too.
+ * Each section type has a 'group' (the builder's "Add section" list groups by
+ * it, in the order of 'groups'). The builder draws its forms from this too.
  */
 function site_schema(): array
 {
     $title = ['type' => 'text', 'label' => 'Title', 'max' => 80];
+    $intro = ['type' => 'textarea', 'label' => 'Introduction', 'max' => 300];
+    $buttonText = ['type' => 'text', 'label' => 'Button text', 'max' => 40];
+    $buttonLink = ['type' => 'link', 'label' => 'Button link', 'help' => 'A web address, #contact (a section), mailto: or tel:.'];
     return [
+        'groups' => ['intro' => 'Introduce yourself', 'offer' => 'What you offer', 'trust' => 'Build trust', 'contact' => 'Get in touch'],
         'settings' => [
             'siteName' => ['type' => 'text', 'label' => 'Site name', 'max' => 80, 'help' => 'Shown at the top of every page.'],
             'theme' => ['type' => 'select', 'label' => 'Theme', 'options' => array_map(fn ($t) => $t['label'], SITE_THEMES)],
@@ -63,35 +72,41 @@ function site_schema(): array
             'seoDescription' => ['type' => 'textarea', 'label' => 'Search description', 'max' => 160],
         ],
         'sections' => [
-            'hero' => ['label' => 'Hero banner', 'fields' => [
+            'hero' => ['label' => 'Hero banner', 'group' => 'intro', 'fields' => [
                 'heading' => ['type' => 'text', 'label' => 'Heading', 'max' => 120],
                 'subheading' => ['type' => 'textarea', 'label' => 'Subheading', 'max' => 300],
-                'buttonText' => ['type' => 'text', 'label' => 'Button text', 'max' => 40],
-                'buttonLink' => ['type' => 'link', 'label' => 'Button link', 'help' => 'A web address, #contact (a section), mailto: or tel:.'],
+                'buttonText' => $buttonText,
+                'buttonLink' => $buttonLink,
                 'image' => ['type' => 'image', 'label' => 'Background image'],
                 'align' => ['type' => 'select', 'label' => 'Alignment', 'options' => ['center' => 'Centred', 'left' => 'Left']],
             ]],
-            'about' => ['label' => 'About', 'fields' => [
+            'about' => ['label' => 'About', 'group' => 'intro', 'fields' => [
                 'title' => $title,
                 'text' => ['type' => 'textarea', 'label' => 'Text', 'max' => 2000],
                 'image' => ['type' => 'image', 'label' => 'Photo'],
             ]],
-            'services' => ['label' => 'Services', 'fields' => [
+            'services' => ['label' => 'Services', 'group' => 'offer', 'fields' => [
                 'title' => $title,
-                'intro' => ['type' => 'textarea', 'label' => 'Introduction', 'max' => 300],
+                'intro' => $intro,
                 'items' => ['type' => 'list', 'label' => 'Services', 'maxItems' => 12, 'fields' => [
                     'title' => ['type' => 'text', 'label' => 'Name', 'max' => 80],
                     'text' => ['type' => 'textarea', 'label' => 'Description', 'max' => 300],
                 ]],
             ]],
-            'gallery' => ['label' => 'Gallery', 'fields' => [
+            // The products themselves come from Backoffice > My Products (includes/cards.php), as on the card.
+            'shop' => ['label' => 'Shop', 'group' => 'offer', 'fields' => [
+                'title' => $title,
+                'intro' => ['type' => 'textarea', 'label' => 'Introduction', 'max' => 300,
+                    'help' => 'Your products and prices come from Backoffice → My Products. Visitors pay with Maya; the sale, less the platform fee, goes to your Available Balance.'],
+            ]],
+            'gallery' => ['label' => 'Gallery', 'group' => 'trust', 'fields' => [
                 'title' => $title,
                 'images' => ['type' => 'list', 'label' => 'Images', 'maxItems' => 24, 'fields' => [
                     'image' => ['type' => 'image', 'label' => 'Image'],
                     'caption' => ['type' => 'text', 'label' => 'Caption', 'max' => 120],
                 ]],
             ]],
-            'testimonials' => ['label' => 'Testimonials', 'fields' => [
+            'testimonials' => ['label' => 'Testimonials', 'group' => 'trust', 'fields' => [
                 'title' => $title,
                 'items' => ['type' => 'list', 'label' => 'Testimonials', 'maxItems' => 12, 'fields' => [
                     'quote' => ['type' => 'textarea', 'label' => 'Quote', 'max' => 400],
@@ -99,29 +114,29 @@ function site_schema(): array
                     'role' => ['type' => 'text', 'label' => 'Role or company', 'max' => 80],
                 ]],
             ]],
-            'video' => ['label' => 'Video', 'fields' => [
+            'video' => ['label' => 'Video', 'group' => 'intro', 'fields' => [
                 'title' => $title,
                 'url' => ['type' => 'video', 'label' => 'YouTube or Vimeo link'],
                 'caption' => ['type' => 'text', 'label' => 'Caption', 'max' => 200],
             ]],
-            'text' => ['label' => 'Text', 'fields' => [
+            'text' => ['label' => 'Text', 'group' => 'intro', 'fields' => [
                 'title' => $title,
                 'text' => ['type' => 'textarea', 'label' => 'Text', 'max' => 4000],
             ]],
-            'cta' => ['label' => 'Call to action', 'fields' => [
+            'cta' => ['label' => 'Call to action', 'group' => 'contact', 'fields' => [
                 'heading' => ['type' => 'text', 'label' => 'Heading', 'max' => 120],
                 'text' => ['type' => 'textarea', 'label' => 'Text', 'max' => 300],
-                'buttonText' => ['type' => 'text', 'label' => 'Button text', 'max' => 40],
+                'buttonText' => $buttonText,
                 'buttonLink' => ['type' => 'link', 'label' => 'Button link'],
             ]],
-            'faq' => ['label' => 'Questions & answers', 'fields' => [
+            'faq' => ['label' => 'Questions & answers', 'group' => 'trust', 'fields' => [
                 'title' => $title,
                 'items' => ['type' => 'list', 'label' => 'Questions', 'maxItems' => 20, 'fields' => [
                     'q' => ['type' => 'text', 'label' => 'Question', 'max' => 200],
                     'a' => ['type' => 'textarea', 'label' => 'Answer', 'max' => 1000],
                 ]],
             ]],
-            'contact' => ['label' => 'Contact', 'fields' => [
+            'contact' => ['label' => 'Contact', 'group' => 'contact', 'fields' => [
                 'title' => $title,
                 'text' => ['type' => 'textarea', 'label' => 'Text', 'max' => 300],
                 'form' => ['type' => 'bool', 'label' => 'Contact form (messages go to your Contacts)'],
@@ -129,12 +144,95 @@ function site_schema(): array
                 'showPhone' => ['type' => 'bool', 'label' => 'Show my phone number'],
                 'showWhatsapp' => ['type' => 'bool', 'label' => 'Show my WhatsApp'],
             ]],
-            'card' => ['label' => 'Digital card', 'fields' => [
+            'card' => ['label' => 'Digital card', 'group' => 'contact', 'fields' => [
                 'title' => $title,
                 'text' => ['type' => 'textarea', 'label' => 'Text', 'max' => 300],
             ]],
-            'social' => ['label' => 'Social links', 'fields' => [
+            'social' => ['label' => 'Social links', 'group' => 'contact', 'fields' => [
                 'title' => $title,
+            ]],
+            // Added 2026-10-15.
+            'imagetext' => ['label' => 'Image & text', 'group' => 'intro', 'fields' => [
+                'title' => $title,
+                'text' => ['type' => 'textarea', 'label' => 'Text', 'max' => 2000],
+                'image' => ['type' => 'image', 'label' => 'Image'],
+                'imageSide' => ['type' => 'select', 'label' => 'Image on the', 'options' => ['left' => 'Left', 'right' => 'Right']],
+                'buttonText' => $buttonText,
+                'buttonLink' => $buttonLink,
+            ]],
+            'banner' => ['label' => 'Image banner', 'group' => 'intro', 'fields' => [
+                'heading' => ['type' => 'text', 'label' => 'Heading', 'max' => 120],
+                'text' => ['type' => 'textarea', 'label' => 'Text', 'max' => 300],
+                'image' => ['type' => 'image', 'label' => 'Background image'],
+                'height' => ['type' => 'select', 'label' => 'Height', 'options' => ['medium' => 'Medium', 'tall' => 'Tall', 'short' => 'Short']],
+                'align' => ['type' => 'select', 'label' => 'Alignment', 'options' => ['center' => 'Centred', 'left' => 'Left']],
+                'buttonText' => $buttonText,
+                'buttonLink' => $buttonLink,
+            ]],
+            'pricing' => ['label' => 'Packages & prices', 'group' => 'offer', 'fields' => [
+                'title' => $title,
+                'intro' => $intro,
+                'items' => ['type' => 'list', 'label' => 'Packages', 'maxItems' => 6, 'fields' => [
+                    'name' => ['type' => 'text', 'label' => 'Package name', 'max' => 80],
+                    'price' => ['type' => 'text', 'label' => 'Price', 'max' => 40, 'help' => 'For example ₱1,500, or Free.'],
+                    'period' => ['type' => 'text', 'label' => 'Per (optional)', 'max' => 40, 'help' => 'For example per session or per month.'],
+                    'features' => ['type' => 'textarea', 'label' => 'What\'s included', 'max' => 600, 'help' => 'One item per line.'],
+                    'badge' => ['type' => 'text', 'label' => 'Badge (optional)', 'max' => 30, 'help' => 'For example Best value.'],
+                    'featured' => ['type' => 'bool', 'label' => 'Highlight this package'],
+                    'buttonText' => $buttonText,
+                    'buttonLink' => $buttonLink,
+                ]],
+            ]],
+            'steps' => ['label' => 'Steps (how it works)', 'group' => 'offer', 'fields' => [
+                'title' => $title,
+                'intro' => $intro,
+                'items' => ['type' => 'list', 'label' => 'Steps', 'maxItems' => 8, 'fields' => [
+                    'title' => ['type' => 'text', 'label' => 'Step', 'max' => 80],
+                    'text' => ['type' => 'textarea', 'label' => 'Description', 'max' => 300],
+                ]],
+            ]],
+            'stats' => ['label' => 'Numbers', 'group' => 'trust', 'fields' => [
+                'title' => $title,
+                'items' => ['type' => 'list', 'label' => 'Numbers', 'maxItems' => 8, 'fields' => [
+                    'value' => ['type' => 'text', 'label' => 'Number', 'max' => 20, 'help' => 'For example 500+ or 10 years.'],
+                    'label' => ['type' => 'text', 'label' => 'What it counts', 'max' => 80],
+                ]],
+            ]],
+            'team' => ['label' => 'Team', 'group' => 'trust', 'fields' => [
+                'title' => $title,
+                'intro' => $intro,
+                'items' => ['type' => 'list', 'label' => 'Team members', 'maxItems' => 12, 'fields' => [
+                    'photo' => ['type' => 'image', 'label' => 'Photo'],
+                    'name' => ['type' => 'text', 'label' => 'Name', 'max' => 80],
+                    'role' => ['type' => 'text', 'label' => 'Role', 'max' => 80],
+                    'text' => ['type' => 'textarea', 'label' => 'About', 'max' => 300],
+                ]],
+            ]],
+            'logos' => ['label' => 'Logos & partners', 'group' => 'trust', 'fields' => [
+                'title' => $title,
+                'items' => ['type' => 'list', 'label' => 'Logos', 'maxItems' => 16, 'fields' => [
+                    'image' => ['type' => 'image', 'label' => 'Logo'],
+                    'name' => ['type' => 'text', 'label' => 'Name', 'max' => 80],
+                    'link' => ['type' => 'link', 'label' => 'Link (optional)'],
+                ]],
+            ]],
+            'location' => ['label' => 'Location & hours', 'group' => 'contact', 'fields' => [
+                'title' => $title,
+                'address' => ['type' => 'textarea', 'label' => 'Address', 'max' => 300],
+                'mapLink' => ['type' => 'link', 'label' => 'Map link', 'help' => 'Your place on Google Maps: Share → Copy link. Visitors get a "Get directions" button.'],
+                'hours' => ['type' => 'list', 'label' => 'Opening hours', 'maxItems' => 10, 'fields' => [
+                    'day' => ['type' => 'text', 'label' => 'Days', 'max' => 60],
+                    'time' => ['type' => 'text', 'label' => 'Hours', 'max' => 60],
+                ]],
+                'note' => ['type' => 'textarea', 'label' => 'Note (optional)', 'max' => 300],
+            ]],
+            'links' => ['label' => 'Link buttons', 'group' => 'contact', 'fields' => [
+                'title' => $title,
+                'intro' => $intro,
+                'items' => ['type' => 'list', 'label' => 'Buttons', 'maxItems' => 12, 'fields' => [
+                    'label' => ['type' => 'text', 'label' => 'Button text', 'max' => 80],
+                    'link' => ['type' => 'link', 'label' => 'Link'],
+                ]],
             ]],
         ],
     ];
@@ -184,7 +282,7 @@ function site_link($v): string
 function site_image($v): string
 {
     $v = site_line($v, 500);
-    if (preg_match('#^' . SITE_UPLOAD_DIR . '/[a-f0-9]{12}/[a-f0-9]{24}\.(jpg|png|webp|gif)$#', $v)) {
+    if (preg_match('#^' . SITE_UPLOAD_DIR . '/[a-f0-9]{12}/[a-f0-9]{24}\.(jpg|png|webp|gif)$#', $v) || image_upload_is_ours($v, AVATAR_DIR)) {
         return $v;
     }
     return safe_url($v, false);
@@ -276,8 +374,18 @@ function site_new_id(string $type): string
  * The member's site
  * ------------------------------------------------------------------- */
 
-/** Whether the member owns an active domain (the builder is unlocked). */
+/**
+ * Whether the member may build and publish a website: every active portal
+ * member (no .com domain needed). Without a domain the site is shown at its
+ * portal address (site_portal_url()) and linked from their card.
+ */
 function site_unlocked(string $userId): bool
+{
+    return (bool) db_value('SELECT 1 FROM users WHERE id = ? AND status = "active" AND role <> "visitor"', [$userId]);
+}
+
+/** Whether the member owns an active .com domain (their website is shown there too). */
+function site_has_domain(string $userId): bool
 {
     return (bool) db_value('SELECT 1 FROM user_domains WHERE user_id = ? AND status = "active" LIMIT 1', [$userId]);
 }
@@ -296,6 +404,9 @@ function site_template(string $userId): array
     if ($services) {
         $sections[] = ['type' => 'services', 'data' => ['title' => 'What I do', 'items' => array_map(fn ($s) => ['title' => $s, 'text' => ''], array_slice($services, 0, 12))]];
     }
+    if (db_value('SELECT 1 FROM member_products WHERE user_id = ? AND active = 1 LIMIT 1', [$userId])) {
+        $sections[] = ['type' => 'shop', 'data' => ['title' => 'Shop', 'intro' => 'Order online and pay securely with Maya.']];
+    }
     $sections[] = ['type' => 'card', 'data' => ['title' => 'My digital card', 'text' => 'Save my contact details or open my 1EVOAI digital card.']];
     if (array_filter((array) ($p['socials'] ?? []))) {
         $sections[] = ['type' => 'social', 'data' => ['title' => 'Follow me']];
@@ -307,6 +418,226 @@ function site_template(string $userId): array
         'sections' => array_map(fn ($s) => $s + ['id' => $s['type'] === 'contact' ? 'contact' : site_new_id($s['type']), 'hidden' => false], $sections),
     ];
     return site_sanitize($site);
+}
+
+/**
+ * Starting designs members pick in the builder ("Start from a design"). Each
+ * is filled in from the member's card profile by site_design(). Text the member
+ * should replace is written as guidance (never as made-up facts, numbers or
+ * reviews); the "Join my team" design uses the real packages from the CMS.
+ */
+const SITE_DESIGNS = [
+    'professional' => ['label' => 'Professional', 'theme' => 'gold', 'font' => 'sans', 'accent' => '',
+        'description' => 'A clean personal page: who you are, what you do, your numbers and how to reach you.'],
+    'business' => ['label' => 'Business & Shop', 'theme' => 'light', 'font' => 'sans', 'accent' => '',
+        'description' => 'Sell your products: the shop first, why choose you, how ordering works, questions, location.'],
+    'coach' => ['label' => 'Coach & Mentor', 'theme' => 'ocean', 'font' => 'serif', 'accent' => '',
+        'description' => 'Your packages and prices, how it works, testimonials, questions and a booking call to action.'],
+    'community' => ['label' => 'Join My Team', 'theme' => 'gold', 'font' => 'serif', 'accent' => '',
+        'description' => 'Invite people to 88MMM Circle with your Referrer ID: the packages, how to join and questions.'],
+    'creator' => ['label' => 'Personal Brand', 'theme' => 'rose', 'font' => 'rounded', 'accent' => '',
+        'description' => 'A link-in-bio style page: your link buttons first, then about you, photos and your socials.'],
+    'local' => ['label' => 'Local Services', 'theme' => 'forest', 'font' => 'sans', 'accent' => '',
+        'description' => 'For a shop, clinic or studio: services, about, your team, location and opening hours.'],
+    'portfolio' => ['label' => 'Portfolio', 'theme' => 'light', 'font' => 'serif', 'accent' => '#7c3aed',
+        'description' => 'Show your work: a featured project, numbers, clients and partners, and a call to action.'],
+    'simple' => ['label' => 'Simple Card', 'theme' => 'light', 'font' => 'rounded', 'accent' => '#0f766e',
+        'description' => 'One short page: your name, a few link buttons, your digital card and a contact form.'],
+];
+
+/** The design $key as a whole site for this member (sanitized like any saved site). */
+function site_design(string $key, string $userId): array
+{
+    $design = SITE_DESIGNS[$key] ?? null;
+    if ($design === null) {
+        throw new InvalidArgumentException('Choose one of the designs.');
+    }
+    $p = get_member_profile($userId);
+    $name = trim((string) $p['name']) ?: 'My website';
+    $role = trim(implode(' · ', array_filter([trim((string) $p['title']), trim((string) $p['company'])])));
+    $bio = trim((string) $p['bio']);
+    $avatar = (string) ($p['avatar'] ?? '');
+    $profileServices = array_values(array_filter(array_map(fn ($s) => trim((string) $s), (array) ($p['services'] ?? []))));
+    $hasSocials = (bool) array_filter((array) ($p['socials'] ?? []));
+    $email = (string) ($p['email'] ?? '');
+    // A real-looking phone number only (cards start with a placeholder such as +63 900 000 0000).
+    $phone = preg_replace('/[^\d+]/', '', (string) ($p['phone'] ?? '')) ?? '';
+    $phone = strlen(ltrim($phone, '+')) >= 7 && !preg_match('/0{6,}/', $phone) ? $phone : '';
+    $memberId = (string) db_value('SELECT id FROM mlm_accounts WHERE user_id = ? ORDER BY head_number, id LIMIT 1', [$userId]);
+    $signup = $memberId !== '' ? crm_link(['view' => 'main', 'ref' => $memberId]) . '#register' : '#contact';
+    $joinText = $memberId !== '' ? "my Referrer ID {$memberId}" : 'my Referrer ID';
+
+    $sec = static fn (string $id, string $type, array $data, bool $hidden = false): array => ['id' => $id, 'type' => $type, 'hidden' => $hidden, 'data' => $data];
+    $hero = static fn (string $sub, string $buttonText, string $buttonLink, string $align = 'center'): array => $sec('home', 'hero', [
+        'heading' => $name, 'subheading' => $sub, 'buttonText' => $buttonText, 'buttonLink' => $buttonLink, 'image' => '', 'align' => $align]);
+    $about = $sec('about', 'about', ['title' => 'About me', 'text' => $bio !== '' ? $bio : 'Tell visitors who you are, what you do and how you can help them.', 'image' => $avatar]);
+    $services = static fn (string $title): array => $sec('services', 'services', ['title' => $title, 'intro' => '', 'items' => $profileServices
+        ? array_map(fn ($s) => ['title' => $s, 'text' => ''], array_slice($profileServices, 0, 12))
+        : array_map(fn ($n) => ['title' => "Your $n service", 'text' => 'Describe what you offer and who it is for.'], ['first', 'second', 'third'])]);
+    $testimonials = $sec('testimonials', 'testimonials', ['title' => 'What clients say', 'items' => [
+        ['quote' => 'Ask a client you have helped for a sentence or two about working with you, and put it here.', 'name' => 'Client name', 'role' => 'Their company or town'],
+        ['quote' => 'A second short quote from a happy client goes here.', 'name' => 'Client name', 'role' => 'Their company or town'],
+    ]]);
+    $stats = static fn (array $labels): array => $sec('numbers', 'stats', ['title' => 'In numbers', 'items' => array_map(fn ($l) => ['value' => '0', 'label' => $l], $labels)]);
+    $hours = [['day' => 'Monday – Friday', 'time' => '9:00 AM – 6:00 PM'], ['day' => 'Saturday', 'time' => '9:00 AM – 1:00 PM'], ['day' => 'Sunday', 'time' => 'Closed']];
+    $location = static fn (string $title): array => $sec('location', 'location', ['title' => $title, 'address' => "Your street and number\nYour city", 'mapLink' => '', 'hours' => $hours, 'note' => '']);
+    $card = $sec('card', 'card', ['title' => 'My digital card', 'text' => 'Save my contact details or open my 1EVOAI digital card.']);
+    $social = $sec('social', 'social', ['title' => 'Follow me'], !$hasSocials);
+    $contact = static fn (string $title = 'Contact me'): array => $sec('contact', 'contact', ['title' => $title, 'text' => 'Send me a message and I will get back to you.',
+        'form' => true, 'showEmail' => true, 'showPhone' => false, 'showWhatsapp' => false]);
+    $cta = static fn (string $heading, string $text, string $button, string $link): array => $sec('start', 'cta', ['heading' => $heading, 'text' => $text, 'buttonText' => $button, 'buttonLink' => $link]);
+
+    switch ($key) {
+        case 'professional':
+            $sections = [$hero($role !== '' ? $role : 'Welcome to my page.', 'Get in touch', '#contact'), $about, $services('What I do'),
+                $stats(['Years of experience', 'Clients helped', 'Projects completed']), $testimonials, $card, $social, $contact()];
+            break;
+        case 'business':
+            $sections = [
+                $hero($role !== '' ? $role : 'Quality products, delivered to you.', 'Shop now', '#shop', 'left'),
+                $sec('shop', 'shop', ['title' => 'Shop', 'intro' => 'Order online and pay securely with Maya.']),
+                $sec('why', 'imagetext', ['title' => 'Why choose us', 'text' => "Tell customers what makes your products special: quality, price, service or where they come from.\n\nAdd a photo of your products or your team.", 'image' => $avatar, 'imageSide' => 'right', 'buttonText' => '', 'buttonLink' => '']),
+                $sec('how', 'steps', ['title' => 'How to order', 'intro' => '', 'items' => [
+                    ['title' => 'Choose your products', 'text' => 'Pick what you need in the shop above.'],
+                    ['title' => 'Pay securely', 'text' => 'Pay online with Maya, by card or with your Maya wallet.'],
+                    ['title' => 'Get it delivered', 'text' => 'We contact you to arrange delivery.'],
+                ]]),
+                $sec('faq', 'faq', ['title' => 'Questions', 'items' => [
+                    ['q' => 'How long does delivery take?', 'a' => 'Explain your delivery times and the areas you deliver to.'],
+                    ['q' => 'Can I return a product?', 'a' => 'Explain your rules for returns and exchanges.'],
+                ]]),
+                $location('Visit us'), $contact('Contact us'),
+            ];
+            break;
+        case 'coach':
+            $plan = static fn (string $n, string $per, string $features, bool $featured): array => ['name' => $n, 'price' => 'Set your price', 'period' => $per,
+                'features' => $features, 'badge' => $featured ? 'Recommended' : '', 'featured' => $featured, 'buttonText' => 'Book now', 'buttonLink' => '#contact'];
+            $sections = [
+                $hero($role !== '' ? $role : 'I help people reach their goals, one step at a time.', 'See my packages', '#packages'), $about,
+                $sec('packages', 'pricing', ['title' => 'Packages', 'intro' => 'Choose the package that fits you. Not sure? Send me a message.', 'items' => [
+                    $plan('Starter session', 'per session', "One-on-one session\nYour action plan\nA follow-up message", false),
+                    $plan('Monthly coaching', 'per month', "A session every week\nAction plan and check-ins\nMessage support", true),
+                    $plan('VIP mentoring', '', "Everything in Monthly coaching\nPriority scheduling\nExtra resources", false),
+                ]]),
+                $sec('how', 'steps', ['title' => 'How it works', 'intro' => '', 'items' => [
+                    ['title' => 'Get in touch', 'text' => 'Send me a message about what you want to achieve.'],
+                    ['title' => 'Make a plan', 'text' => 'We agree on your goals and the package that fits.'],
+                    ['title' => 'Start and grow', 'text' => 'We meet regularly and track your progress together.'],
+                ]]),
+                $testimonials,
+                $sec('faq', 'faq', ['title' => 'Questions', 'items' => [
+                    ['q' => 'How do the sessions work?', 'a' => 'Explain where and how you meet: online, by phone or in person.'],
+                    ['q' => 'Can I change my package later?', 'a' => 'Explain your rules for changing or cancelling a package.'],
+                ]]),
+                $cta('Ready to start?', 'Send me a message and let\'s talk about your goals.', 'Message me', '#contact'), $contact(),
+            ];
+            break;
+        case 'community':
+            $cms = get_cms();
+            // Each package's button opens the sign-up form with that package chosen (Maya or an activation code).
+            $package = static fn (string $tier): array => [
+                'name' => (string) ($cms[$tier . 'TierName'] ?? ''), 'price' => peso((float) ($cms[$tier . 'Price'] ?? 0)), 'period' => '',
+                'features' => implode("\n", array_map('strval', (array) ($cms[$tier . 'Perks'] ?? []))),
+                'badge' => '', 'featured' => false, 'buttonText' => 'Join with my ID',
+                'buttonLink' => $memberId !== '' && $tier === 'chairmans' ? crm_link(['view' => 'main', 'ref' => $memberId, 'package' => 'membership_chairmans']) . '#register' : $signup];
+            $sections = [
+                $hero('Join me in 88MMM Circle: your own 1EVOAI digital card, a team that grows together, and mentors who help you start.', 'Join with my ID', $signup),
+                $about,
+                $sec('packages', 'pricing', ['title' => 'Choose your package', 'intro' => "Pay online with Maya or with an activation code. Use $joinText when you sign up.",
+                    'items' => [$package('executive'), $package('chairmans')]]),
+                $sec('how', 'steps', ['title' => 'How to join', 'intro' => '', 'items' => [
+                    ['title' => 'Create your account', 'text' => "Use the Join button: $joinText is filled in for you."],
+                    ['title' => 'Pay for your package', 'text' => 'Pay online with Maya, or with an activation code and its PIN.'],
+                    ['title' => 'Get started', 'text' => 'Your 1EVOAI digital card and Member Backoffice are ready right away.'],
+                ]]),
+                $sec('faq', 'faq', ['title' => 'Questions', 'items' => [
+                    ['q' => 'What is a 1EVOAI card?', 'a' => 'A card with an NFC chip. Tap it on a phone and your digital card opens: your photo, contact details, links and services, ready to save.'],
+                    ['q' => 'Does the person I tap need an app?', 'a' => 'No. Phones open the card in the browser, and a QR code works for phones without NFC.'],
+                    ['q' => 'How do I join?', 'a' => "Use the Join button on this page, choose a package, and keep $joinText as your referrer."],
+                ]]),
+                $cta('Ready to join?', "Create your account with $joinText and I'll help you get set up.", 'Join with my ID', $signup),
+                $card, $contact(),
+            ];
+            break;
+        case 'creator':
+            $links = [['label' => 'My latest offer', 'link' => ''], ['label' => 'Work with me', 'link' => '#contact']];
+            if ($email !== '' && valid_email($email)) {
+                $links[] = ['label' => 'Email me', 'link' => 'mailto:' . $email];
+            }
+            $sections = [
+                $hero($role !== '' ? $role : 'Welcome! Find my links, photos and latest news here.', 'My links', '#links'),
+                $sec('links', 'links', ['title' => 'My links', 'intro' => '', 'items' => $links]),
+                $about,
+                $sec('photos', 'gallery', ['title' => 'Photos', 'images' => []], true),
+                $sec('video', 'video', ['title' => 'Watch', 'url' => '', 'caption' => ''], true),
+                $social, $card, $contact(),
+            ];
+            break;
+        case 'local':
+            $sections = [
+                $hero($role !== '' ? $role : 'Friendly, reliable service for our neighbourhood.', $phone !== '' ? 'Call us' : 'Contact us', $phone !== '' ? 'tel:' . $phone : '#contact', 'left'),
+                $services('Our services'),
+                $sec('about', 'imagetext', ['title' => 'About us', 'text' => $bio !== '' ? $bio : 'Tell visitors your story: how you started, what you are good at and why customers come back.',
+                    'image' => $avatar, 'imageSide' => 'left', 'buttonText' => '', 'buttonLink' => '']),
+                $sec('team', 'team', ['title' => 'Meet the team', 'intro' => '', 'items' => [
+                    ['photo' => $avatar, 'name' => $name, 'role' => trim((string) $p['title']) ?: 'Owner', 'text' => ''],
+                    ['photo' => '', 'name' => 'Team member', 'role' => 'Their role', 'text' => 'A line about what they do.'],
+                ]]),
+                $testimonials, $location('Find us'), $contact('Contact us'),
+            ];
+            break;
+        case 'portfolio':
+            $sections = [
+                $hero($role !== '' ? $role : 'A selection of my work.', 'See my work', '#work'),
+                $sec('work', 'imagetext', ['title' => 'Featured project', 'text' => "Describe a project you are proud of: the goal, what you did and the result.\n\nAdd a photo of the work.",
+                    'image' => '', 'imageSide' => 'left', 'buttonText' => '', 'buttonLink' => '']),
+                $sec('more', 'gallery', ['title' => 'More of my work', 'images' => []], true),
+                $stats(['Projects', 'Clients', 'Years of experience']),
+                $sec('clients', 'logos', ['title' => 'Clients & partners', 'items' => array_fill(0, 3, ['image' => '', 'name' => 'Client name', 'link' => ''])]),
+                $testimonials,
+                $cta('Let\'s work together', 'Tell me about your project and I will get back to you.', 'Start a project', '#contact'), $contact(),
+            ];
+            break;
+        default: // simple
+            $links = [];
+            if ($email !== '' && valid_email($email)) {
+                $links[] = ['label' => 'Email me', 'link' => 'mailto:' . $email];
+            }
+            if ($phone !== '') {
+                $links[] = ['label' => 'Call me', 'link' => 'tel:' . $phone];
+            }
+            $links[] = ['label' => 'Send me a message', 'link' => '#contact'];
+            $sections = [$hero($role, '', ''), $sec('links', 'links', ['title' => 'Reach me', 'intro' => '', 'items' => $links]), $card, $social, $contact()];
+    }
+    return site_sanitize([
+        'settings' => ['siteName' => $name, 'theme' => $design['theme'], 'accent' => $design['accent'], 'font' => $design['font'], 'menu' => true, 'cardButton' => true,
+            'footer' => '', 'seoTitle' => mb_substr($name . ($role !== '' ? ' — ' . $role : ''), 0, 70), 'seoDescription' => mb_substr($bio, 0, 160)],
+        'sections' => $sections,
+    ]);
+}
+
+/** The designs for the builder's picker: name, description, colours, font and the sections each one has. */
+function site_design_choices(string $userId): array
+{
+    $schema = site_schema();
+    $out = [];
+    foreach (SITE_DESIGNS as $key => $d) {
+        $t = SITE_THEMES[$d['theme']];
+        $out[] = [
+            'key' => $key, 'label' => $d['label'], 'description' => $d['description'],
+            'colors' => [$t['bg'], $t['surface'], $d['accent'] !== '' ? $d['accent'] : $t['accent']],
+            'font' => SITE_FONTS[$d['font']]['label'],
+            'sections' => array_values(array_map(fn ($s) => $schema['sections'][$s['type']]['label'], array_filter(site_design($key, $userId)['sections'], fn ($s) => !$s['hidden']))),
+        ];
+    }
+    return $out;
+}
+
+/** Replace the member's draft with a design (the published site stays until the next Publish). */
+function site_apply_design(array $user, string $key): array
+{
+    site_require_unlocked($user);
+    return site_save($user, site_design($key, $user['id']));
 }
 
 function site_row(string $userId): ?array
@@ -322,7 +653,7 @@ function site_draft(string $userId): array
     return is_array($site) ? site_sanitize($site) : site_template($userId);
 }
 
-/** The site visitors see, or null: published, not suspended, and the member owns an active domain. */
+/** The site visitors see, or null: published, not suspended, and the member is still an active member. */
 function site_public(string $userId): ?array
 {
     $row = db_one('SELECT published, status FROM member_websites WHERE user_id = ?', [$userId]);
@@ -333,7 +664,7 @@ function site_public(string $userId): ?array
     return is_array($site) ? $site : null;
 }
 
-/** Whether visitors of the member's domain see their website (and the card moves to ?view=card). */
+/** Whether the member's website is published and visible (on their domain, if any, the card moves to ?view=card). */
 function site_is_live(string $userId): bool
 {
     return $userId !== '' && (bool) db_value('SELECT 1 FROM member_websites WHERE user_id = ? AND status = "published" AND published IS NOT NULL', [$userId]) && site_unlocked($userId);
@@ -351,7 +682,7 @@ function site_live_url(string $userId): ?string
     return $scheme . '://' . $domain . base_path() . '/';
 }
 
-/** The site on this portal (works before the domain's DNS does). */
+/** The site on this portal: the website's address without a domain (and before a domain's DNS works). */
 function site_portal_url(string $userId): string
 {
     return base_url() . '/index.php?' . http_build_query(['view' => 'site', 'u' => $userId]);
@@ -385,7 +716,7 @@ function site_card_back(string $userId, ?array $viewer): ?array
 function site_require_unlocked(array $user): void
 {
     if (!site_unlocked($user['id'])) {
-        throw new InvalidArgumentException('Buy a .com domain first: the website builder comes with it.');
+        throw new InvalidArgumentException('Only active members can build a website.');
     }
 }
 
@@ -507,6 +838,13 @@ function site_builder_state(array $user): array
         'views' => (int) ($row['views'] ?? 0),
         'liveUrl' => site_live_url($user['id']),
         'portalUrl' => site_portal_url($user['id']),
+        'domain' => site_has_domain($user['id']),
+        'maxSections' => SITE_MAX_SECTIONS,
+        // No draft saved yet: the builder opens "Start from a design".
+        'fresh' => $row === null,
+        'designs' => site_design_choices($user['id']),
+        // Where visitors find the published site: the domain, or the portal address without one.
+        'publicUrl' => site_live_url($user['id']) ?? site_portal_url($user['id']),
         'previewUrl' => url('site', ['u' => $user['id'], 'preview' => 1]),
         'images' => array_map(fn ($r) => ['path' => $r['path'], 'url' => media_url($r['path'])], db_all('SELECT path FROM member_website_images WHERE user_id = ? ORDER BY id DESC LIMIT 60', [$user['id']])),
     ];
@@ -515,6 +853,65 @@ function site_builder_state(array $user): array
 /* ---------------------------------------------------------------------
  * Images
  * ------------------------------------------------------------------- */
+
+/**
+ * Whether an uploaded image's bytes carry script or page code (a "polyglot"
+ * file). Only patterns too long to turn up by chance in compressed image
+ * data: a short one such as "<?=" appears in roughly one large photo in
+ * three. The upload folders never run PHP either (uploads/.htaccess).
+ */
+function upload_has_code(string $bytes): bool
+{
+    return preg_match('/<\?php|<script|<html/i', $bytes) === 1;
+}
+
+/** Pictures uploaded by admins and members (shop products, profile photos). */
+const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
+const IMAGE_UPLOAD_MAX_PIXELS = 6000;
+const IMAGE_UPLOAD_TYPES = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp', IMAGETYPE_GIF => 'gif'];
+
+/**
+ * Check an uploaded picture (a $_FILES entry) and store it in $dir (e.g.
+ * uploads/avatars) under a random name; returns its path. Only real JPEG,
+ * PNG, WebP or GIF images up to 5 MB and 6000 pixels a side; GPS and other
+ * hidden data are removed from photos.
+ */
+function image_upload_store(array $file, string $dir): string
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) ($file['tmp_name'] ?? ''))) {
+        throw new InvalidArgumentException(in_array($file['error'] ?? 0, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true) ? 'That picture is too big (5 MB at most).' : 'The picture didn\'t upload. Please choose it again.');
+    }
+    if ((int) $file['size'] > IMAGE_UPLOAD_MAX_BYTES) {
+        throw new InvalidArgumentException('That picture is too big (5 MB at most).');
+    }
+    $info = @getimagesize($file['tmp_name']);
+    if (!$info || !isset(IMAGE_UPLOAD_TYPES[$info[2]])) {
+        throw new InvalidArgumentException('Upload a JPEG, PNG, WebP or GIF picture.');
+    }
+    if ($info[0] < 1 || $info[1] < 1 || $info[0] > IMAGE_UPLOAD_MAX_PIXELS || $info[1] > IMAGE_UPLOAD_MAX_PIXELS) {
+        throw new InvalidArgumentException('That picture is too large (' . IMAGE_UPLOAD_MAX_PIXELS . ' pixels a side at most).');
+    }
+    $bytes = (string) file_get_contents($file['tmp_name']);
+    if (upload_has_code($bytes)) {
+        throw new InvalidArgumentException('That file is not a plain picture.');
+    }
+    $ext = IMAGE_UPLOAD_TYPES[$info[2]];
+    $bytes = $ext === 'jpg' ? site_jpeg_strip($bytes) : ($ext === 'png' ? site_png_strip($bytes) : $bytes);
+    if (!is_dir(APP_ROOT . '/' . $dir) && !mkdir(APP_ROOT . '/' . $dir, 0775, true) && !is_dir(APP_ROOT . '/' . $dir)) {
+        throw new RuntimeException('Could not create ' . $dir);
+    }
+    $path = $dir . '/' . bin2hex(random_bytes(12)) . '.' . $ext;
+    if (file_put_contents(APP_ROOT . '/' . $path, $bytes) === false) {
+        throw new RuntimeException('Could not save ' . $path);
+    }
+    return $path;
+}
+
+/** Whether $path is a picture image_upload_store() put in $dir. */
+function image_upload_is_ours(string $path, string $dir): bool
+{
+    return preg_match('#^' . preg_quote($dir, '#') . '/[0-9a-f]{24}\.(jpg|png|webp|gif)$#', $path) === 1;
+}
 
 /** Remove the GPS position (and XMP, IPTC, comments) from a JPEG; orientation is kept. */
 function site_jpeg_strip(string $bytes): string
@@ -641,7 +1038,7 @@ function site_upload_image(array $user, array $file): array
         throw new InvalidArgumentException('That image is too large (' . SITE_IMAGE_MAX_PIXELS . ' pixels a side at most).');
     }
     $bytes = (string) file_get_contents($file['tmp_name']);
-    if (preg_match('/<\?(php|=)|<script|<html|<svg/i', $bytes)) {
+    if (upload_has_code($bytes)) {
         throw new InvalidArgumentException('That file is not a plain image.');
     }
     if ((int) db_value('SELECT COUNT(*) FROM member_website_images WHERE user_id = ?', [$user['id']]) >= SITE_IMAGE_QUOTA) {

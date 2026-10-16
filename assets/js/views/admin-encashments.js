@@ -25,7 +25,7 @@
   function summary(modal, r) {
     modal.querySelector('[data-en-summary]').innerHTML =
       '<div class="flex items-center justify-between gap-3"><span class="text-zinc-400">Member</span><span class="text-zinc-200 font-semibold text-right">' + EVO.esc(r.member) + '</span></div>' +
-      '<div class="flex items-center justify-between gap-3"><span class="text-zinc-400">Head</span><span class="font-mono text-zinc-300">' + EVO.esc(r.head) + ' · @' + EVO.esc(r.username) + '</span></div>' +
+      '<div class="flex items-center justify-between gap-3"><span class="text-zinc-400">Account</span><span class="font-mono text-zinc-300">' + EVO.esc(r.head) + ' · @' + EVO.esc(r.username) + '</span></div>' +
       '<div class="flex items-center justify-between gap-3"><span class="text-zinc-400">Request</span><span class="font-mono text-zinc-300">' + EVO.esc(r.id) + '</span></div>' +
       '<div class="flex items-center justify-between gap-3"><span class="text-zinc-400">' + EVO.esc(r.channel) + '</span><span class="text-white font-semibold text-right break-all">' + EVO.esc(r.details) + '</span></div>' +
       '<div class="flex items-center justify-between gap-3 pt-2 border-t border-zinc-800"><span class="text-zinc-400">' + EVO.esc(r.gross) + ' − ' + EVO.esc(r.tax) + ' tax − ' + EVO.esc(r.fee) + ' fee</span><span class="text-base font-black font-mono text-[#ffda72]">' + EVO.esc(r.net) + '</span></div>';

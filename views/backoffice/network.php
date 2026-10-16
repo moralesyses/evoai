@@ -65,10 +65,10 @@
     $unused = array_values(array_filter($codes, fn ($c) => $c['status'] === 'active' && $c['package'] === 'membership_executive'));
 
     $subTabs = [
-        ['id' => 'summary', 'icon' => 'layers', 'label' => 'Network Summary'],
-        ['id' => 'genealogy', 'icon' => 'git-fork', 'label' => 'Network Genealogy (Tree)'],
-        ['id' => 'list', 'icon' => 'users', 'label' => 'Network List (' . count($flat) . ')'],
-        ['id' => 'unilevel', 'icon' => 'folder-tree', 'label' => 'Unilevel Sponsorship Tree'],
+        ['id' => 'summary', 'icon' => 'layers', 'label' => 'Team Summary'],
+        ['id' => 'genealogy', 'icon' => 'git-fork', 'label' => 'Team Tree'],
+        ['id' => 'list', 'icon' => 'users', 'label' => 'Team List (' . count($flat) . ')'],
+        ['id' => 'unilevel', 'icon' => 'folder-tree', 'label' => 'Referral Tree'],
     ];
     $sel = (string) ($_GET['net'] ?? 'summary');
     if (!in_array($sel, array_column($subTabs, 'id'), true)) {
@@ -106,9 +106,9 @@
             <?= $line($color, 'left:50%;top:0;width:2px;height:14px;margin-left:-1px') ?>
             <?php if ($depth === 1): ?>
                 <?php if ($child): ?>
-                    <div data-net-node="<?= e($child['id']) ?>" data-net-expand="<?= e($child['id']) ?>" aria-expanded="true" role="button" tabindex="0" title="Show or hide <?= e($first($child['fullName'])) ?>'s downlines" class="relative cursor-pointer p-3 rounded-2xl bg-zinc-900 border <?= $isLeft ? 'border-blue-500/50 hover:border-blue-400' : 'border-amber-500/50 hover:border-amber-400' ?> shadow-xl text-center w-44 hover:scale-102 transition-transform">
+                    <div data-net-node="<?= e($child['id']) ?>" data-net-expand="<?= e($child['id']) ?>" aria-expanded="true" role="button" tabindex="0" title="Show or hide <?= e($first($child['fullName'])) ?>'s team members" class="relative cursor-pointer p-3 rounded-2xl bg-zinc-900 border <?= $isLeft ? 'border-blue-500/50 hover:border-blue-400' : 'border-amber-500/50 hover:border-amber-400' ?> shadow-xl text-center w-44 hover:scale-102 transition-transform">
                         <button type="button" data-net-info="<?= e($child['id']) ?>" title="Member details" aria-label="Details of <?= e($child['fullName']) ?>" class="absolute top-0 right-1 p-1 text-zinc-500 hover:text-white"><?= icon('eye', 'w-3 h-3') ?></button>
-                        <span class="text-[9px] px-1.5 py-0.2 rounded-full uppercase font-bold <?= $isLeft ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400' ?> block mb-0.5"><?= $isLeft ? 'LEFT LEG' : 'RIGHT LEG' ?></span>
+                        <span class="text-[9px] px-1.5 py-0.2 rounded-full uppercase font-bold <?= $isLeft ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400' ?> block mb-0.5"><?= $isLeft ? 'LEFT TEAM' : 'RIGHT TEAM' ?></span>
                         <div class="font-bold text-white text-xs truncate"><?= e($child['fullName']) ?></div>
                         <div class="text-[9px] text-zinc-400 font-mono">@<?= e($child['username']) ?></div>
                         <div class="mt-1.5 pt-1.5 border-t border-zinc-800 flex justify-around text-[9px] font-mono">
@@ -124,11 +124,11 @@
                 <?php endif; ?>
             <?php else: ?>
                 <?php if ($child): ?>
-                    <div data-net-node="<?= e($child['id']) ?>" data-net-expand="<?= e($child['id']) ?>" aria-expanded="false" role="button" tabindex="0" title="<?= $below ? 'Show ' . e($first($child['fullName'])) . '\'s downlines' : 'No downlines yet' ?>" class="relative cursor-pointer p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-700 text-center w-24 text-[10px]">
+                    <div data-net-node="<?= e($child['id']) ?>" data-net-expand="<?= e($child['id']) ?>" aria-expanded="false" role="button" tabindex="0" title="<?= $below ? 'Show ' . e($first($child['fullName'])) . '\'s team members' : 'No team members yet' ?>" class="relative cursor-pointer p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-700 text-center w-24 text-[10px]">
                         <button type="button" data-net-info="<?= e($child['id']) ?>" title="Member details" aria-label="Details of <?= e($child['fullName']) ?>" class="absolute top-0 right-1 p-0.5 text-zinc-600 hover:text-white"><?= icon('eye', 'w-3 h-3') ?></button>
                         <div class="font-bold text-white truncate"><?= e($first($child['fullName'])) ?></div>
                         <div class="text-[8px] text-zinc-500 font-mono"><?= e($child['id']) ?></div>
-                        <div class="text-[8px] mt-0.5 <?= $below ? 'text-[#f3bd35]' : 'text-zinc-600' ?>" data-net-below><?= $below ? '▾ ' . $below . ' below' : 'No downlines' ?></div>
+                        <div class="text-[8px] mt-0.5 <?= $below ? 'text-[#f3bd35]' : 'text-zinc-600' ?>" data-net-below><?= $below ? '▾ ' . $below . ' below' : 'No team members' ?></div>
                     </div>
                 <?php else: ?>
                     <button type="button" data-net-place="<?= e($parent['id']) ?>" data-net-leg="<?= e($leg) ?>" class="p-2 rounded-xl bg-zinc-950 border border-dashed border-emerald-500/40 text-emerald-400 text-[10px] font-bold w-24 hover:bg-emerald-500/10"><?= $isLeft ? '+ Empty L' : '+ Empty R' ?></button>
@@ -159,74 +159,74 @@
     </div>
 
     <div>
-        <!-- Network Summary -->
+        <!-- Team summary -->
         <div class="space-y-6" data-tab-panel="summary" data-group="net"<?= $sel === 'summary' ? '' : ' hidden' ?>>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="p-5 rounded-3xl bg-[#121212] border border-[#f3bd35]/40 shadow-xl">
-                    <span class="text-zinc-400 text-xs font-semibold block mb-1">Directly Sponsored</span>
+                    <span class="text-zinc-400 text-xs font-semibold block mb-1">Direct Referrals</span>
                     <div class="text-3xl font-black text-white font-mono"><?= e($account['sponsoredCount']) ?></div>
                     <span class="text-[11px] text-emerald-400 font-semibold mt-2 block"><?= peso($account['totalDirectBonus']) ?> Earned (@ ₱<?= num($complan['directReferralBonus']) ?> each)</span>
                 </div>
                 <div class="p-5 rounded-3xl bg-[#121212] border border-blue-500/30 shadow-xl">
-                    <span class="text-zinc-400 text-xs font-semibold block mb-1">Left Downline Team</span>
+                    <span class="text-zinc-400 text-xs font-semibold block mb-1">Left Team</span>
                     <div class="text-3xl font-black text-blue-400 font-mono"><?= e($account['leftCount']) ?></div>
-                    <span class="text-[11px] text-zinc-400 mt-2 block"><?= e($account['leftPoints']) ?> Accumulated Left PV</span>
+                    <span class="text-[11px] text-zinc-400 mt-2 block"><?= e($account['leftPoints']) ?> Accumulated Left Points</span>
                 </div>
                 <div class="p-5 rounded-3xl bg-[#121212] border border-amber-500/30 shadow-xl">
-                    <span class="text-zinc-400 text-xs font-semibold block mb-1">Right Downline Team</span>
+                    <span class="text-zinc-400 text-xs font-semibold block mb-1">Right Team</span>
                     <div class="text-3xl font-black text-amber-400 font-mono"><?= e($account['rightCount']) ?></div>
-                    <span class="text-[11px] text-zinc-400 mt-2 block"><?= e($account['rightPoints']) ?> Accumulated Right PV</span>
+                    <span class="text-[11px] text-zinc-400 mt-2 block"><?= e($account['rightPoints']) ?> Accumulated Right Points</span>
                 </div>
                 <div class="p-5 rounded-3xl bg-[#121212] border border-zinc-800 shadow-xl">
-                    <span class="text-zinc-400 text-xs font-semibold block mb-1">Total Binary Organization</span>
+                    <span class="text-zinc-400 text-xs font-semibold block mb-1">Total Team</span>
                     <div class="text-3xl font-black text-[#ffda72] font-mono"><?= e($account['leftCount'] + $account['rightCount']) ?></div>
-                    <span class="text-[11px] text-zinc-400 mt-2 block">Total PV: <?= e($account['leftPoints'] + $account['rightPoints']) ?></span>
+                    <span class="text-[11px] text-zinc-400 mt-2 block">Total Points:<?= e($account['leftPoints'] + $account['rightPoints']) ?></span>
                 </div>
             </div>
             <div class="p-5 rounded-3xl bg-[#121212] border border-zinc-800 shadow-xl space-y-4">
                 <h3 class="text-base font-bold text-white flex items-center gap-2">
                     <?= icon('award', 'w-5 h-5 text-[#f3bd35]') ?>
-                    Binary Points Overview &amp; Pair Matching Status
+                    Team Points Overview &amp; Match Status
                 </h3>
                 <div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                     <div>
-                        <span class="text-zinc-400 font-semibold block mb-1">Current Strong Leg</span>
-                        <span class="font-bold text-blue-400 text-sm">Left Leg (<?= e($account['leftPoints']) ?> PV / <?= e($account['leftCount']) ?> Members)</span>
+                        <span class="text-zinc-400 font-semibold block mb-1">Current Stronger Team</span>
+                        <span class="font-bold text-blue-400 text-sm">Left Team (<?= e($account['leftPoints']) ?> pts /<?= e($account['leftCount']) ?> Members)</span>
                         <p class="text-[10px] text-zinc-500 mt-1">Carried forward for future matching.</p>
                     </div>
                     <div>
-                        <span class="text-zinc-400 font-semibold block mb-1">Current Pay Leg</span>
-                        <span class="font-bold text-amber-400 text-sm">Right Leg (<?= e($account['rightPoints']) ?> PV / <?= e($account['rightCount']) ?> Members)</span>
-                        <p class="text-[10px] text-zinc-500 mt-1">Every new 100 PV triggers ₱<?= num($complan['pairingBonus']) ?> bonus.</p>
+                        <span class="text-zinc-400 font-semibold block mb-1">Current Matching Team</span>
+                        <span class="font-bold text-amber-400 text-sm">Right Team (<?= e($account['rightPoints']) ?> pts / <?= e($account['rightCount']) ?> Members)</span>
+                        <p class="text-[10px] text-zinc-500 mt-1">Every new 100 points triggers ₱<?= num($complan['pairingBonus']) ?> bonus.</p>
                     </div>
                     <div>
-                        <span class="text-zinc-400 font-semibold block mb-1">Cycle Cap Health</span>
-                        <span class="font-bold text-emerald-400 text-sm"><?= e(max(0, $complan['maxPairsPerCycle'] - $account['cycle' . mlm_current_cycle() . 'PairsToday'])) ?> Pairs Available in <?= $complan['cyclesPerDay'] === 1 ? 'Today\'s Cycle' : 'Cycle ' . mlm_current_cycle() ?></span>
+                        <span class="text-zinc-400 font-semibold block mb-1">Round Cap Health</span>
+                        <span class="font-bold text-emerald-400 text-sm"><?= e(max(0, $complan['maxPairsPerCycle'] - $account['cycle' . mlm_current_cycle() . 'PairsToday'])) ?> Matches Available in <?= $complan['cyclesPerDay'] === 1 ? 'Today\'s Round' : 'Round ' . mlm_current_cycle() ?></span>
                         <p class="text-[10px] text-zinc-500 mt-1">Resets twice daily (12 AM / 12 PM).</p>
                     </div>
                 </div>
                 <div class="flex flex-col sm:flex-row items-center gap-3 pt-2">
-                    <button type="button" data-net-goto="genealogy" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-extrabold text-xs shadow hover:brightness-105 transition-all">Open Visual Genealogy Tree →</button>
-                    <button type="button" data-net-goto="unilevel" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-zinc-200 font-bold text-xs transition-all">Inspect Unilevel Sponsorship →</button>
+                    <button type="button" data-net-goto="genealogy" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-extrabold text-xs shadow hover:brightness-105 transition-all">Open Visual Team Tree →</button>
+                    <button type="button" data-net-goto="unilevel" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-zinc-200 font-bold text-xs transition-all">Inspect Referral Tree →</button>
                 </div>
             </div>
         </div>
 
-        <!-- Binary genealogy tree -->
+        <!-- Team tree -->
         <div class="space-y-4" data-tab-panel="genealogy" data-group="net"<?= $sel === 'genealogy' ? '' : ' hidden' ?>>
             <div class="p-4 rounded-3xl bg-[#121212] border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                     <h3 class="text-base font-bold text-white flex items-center gap-2">
                         <?= icon('git-fork', 'w-5 h-5 text-[#f3bd35]') ?>
-                        Interactive Binary Genealogy Tree
+                        Interactive Team Tree
                     </h3>
-                    <p class="text-xs text-zinc-400">Click a member to show or hide their downlines below; the members above stay in view. The <?= icon('eye', 'w-3 h-3 inline-block', ['style' => 'vertical-align:-2px']) ?> icon shows a member's points. <strong class="text-white">Register Downline</strong> places a new member on your left or right leg, or Auto picks the leg with fewer downlines; an <strong class="text-emerald-400">empty slot</strong> places them under that member.</p>
+                    <p class="text-xs text-zinc-400">Drag the tree with the mouse to move around it. Click a member to show or hide their team members below; the members above stay in view. The <?= icon('eye', 'w-3 h-3 inline-block', ['style' => 'vertical-align:-2px']) ?> icon shows a member's points. <strong class="text-white">Add Team Member</strong> places a new member on your left or right team, or Auto picks the team with fewer members; an <strong class="text-emerald-400">empty slot</strong> places them under that member.</p>
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
                     <span class="text-[11px] text-zinc-400">Unused Codes: <strong class="text-[#ffda72] font-mono"><?= count($unused) ?></strong></span>
                     <button type="button" data-net-register="<?= e($root['id']) ?>" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-extrabold text-xs shadow hover:brightness-105 transition-all whitespace-nowrap">
                         <?= icon('user-plus', 'w-4 h-4') ?>
-                        Register Downline
+                        Add Team Member
                     </button>
                 </div>
             </div>
@@ -234,11 +234,11 @@
             // Where sign-ups with this head's ID go (mlm_signup_placement); labels as in the registration modal.
             $suLeft = (int) ($root['leftCount'] ?? 0);
             $suRight = (int) ($root['rightCount'] ?? 0);
-            $suCount = fn (int $n): string => $n ? $n . ($n === 1 ? ' downline' : ' downlines') : 'empty';
+            $suCount = fn (int $n): string => $n ? $n . ($n === 1 ? ' member' : ' members') : 'empty';
             $suChoices = [
-                'auto' => 'Auto: ' . ($suLeft <= $suRight ? 'left' : 'right') . ' leg (' . ($suLeft === $suRight ? 'tie, left first' : 'fewer downlines') . ')',
-                'left' => 'Left leg · ' . $suCount($suLeft),
-                'right' => 'Right leg · ' . $suCount($suRight),
+                'auto' => 'Auto: ' . ($suLeft <= $suRight ? 'left' : 'right') . ' team (' . ($suLeft === $suRight ? 'tie, left first' : 'fewer members') . ')',
+                'left' => 'Left team · ' . $suCount($suLeft),
+                'right' => 'Right team · ' . $suCount($suRight),
             ];
             $suSaved = $account['signupPlacement'] ?? 'auto';
             ?>
@@ -248,7 +248,7 @@
                         <?= icon('user-check', 'w-4 h-4 text-[#f3bd35]') ?>
                         Sign-up Placement
                     </h4>
-                    <p class="text-xs text-zinc-400 mt-0.5">New members who enter your ID <strong class="font-mono text-[#ffda72]"><?= e($account['id']) ?></strong> as their sponsor when they sign up are placed here. Register Downline starts on this choice too.</p>
+                    <p class="text-xs text-zinc-400 mt-0.5">New members who enter your ID <strong class="font-mono text-[#ffda72]"><?= e($account['id']) ?></strong> as their referrer when they sign up are placed here. Add Team Member starts on this choice too.</p>
                 </div>
                 <div class="w-full sm:w-72 shrink-0">
                     <label for="bo-signup-placement" class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Place new sign-ups on</label>
@@ -259,16 +259,22 @@
                     </select>
                 </div>
             </div>
-            <div class="p-6 rounded-3xl bg-[#0a0a0a] border border-[#f3bd35]/30 overflow-x-auto min-h-[500px] shadow-2xl" data-net-tree>
-                <div class="min-w-[800px] mx-auto flex flex-col items-center" style="width:max-content">
+            <?php // A canvas members drag around with the mouse (bo-network.js); touch screens scroll it natively. ?>
+            <div class="relative rounded-3xl border border-[#f3bd35]/30 overflow-hidden shadow-2xl">
+                <div class="absolute top-3 right-3 z-10 flex items-center gap-2">
+                    <span class="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-black/70 text-[10px] text-zinc-400 pointer-events-none"><?= icon('hand', 'w-3 h-3') ?>Drag to move the tree</span>
+                    <button type="button" data-net-center class="px-2.5 py-1 rounded-lg bg-black/70 hover:bg-zinc-800 border border-zinc-700 text-[10px] font-bold text-zinc-200 flex items-center gap-1" title="Back to the root account"><?= icon('locate-fixed', 'w-3 h-3') ?>Center</button>
+                </div>
+                <div class="evo-net-canvas" data-net-tree tabindex="0" role="region" aria-label="Team tree. Drag with the mouse, or use the arrow keys, to move around.">
+                <div class="min-w-[800px] mx-auto p-6 flex flex-col items-center" style="width:max-content">
                     <div class="flex flex-col items-center">
-                        <div data-net-node="<?= e($root['id']) ?>" role="button" tabindex="0" class="cursor-pointer p-4 rounded-2xl bg-gradient-to-b from-[#221c0e] to-[#120f09] border-2 border-[#f3bd35] shadow-2xl hover:scale-105 transition-transform text-center w-52">
-                            <div class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-[#f3bd35] text-black inline-block mb-1">ROOT HEAD</div>
+                        <div data-net-node="<?= e($root['id']) ?>" data-net-root role="button" tabindex="0" class="cursor-pointer p-4 rounded-2xl bg-gradient-to-b from-[#221c0e] to-[#120f09] border-2 border-[#f3bd35] shadow-2xl hover:scale-105 transition-transform text-center w-52">
+                            <div class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-[#f3bd35] text-black inline-block mb-1">ROOT ACCOUNT</div>
                             <div class="font-bold text-white text-sm"><?= e($root['fullName']) ?></div>
                             <div class="text-[10px] text-zinc-400 font-mono">@<?= e($root['username']) ?></div>
                             <div class="mt-2 pt-2 border-t border-zinc-800/80 flex justify-around text-[10px] font-mono">
-                                <span class="text-blue-400 font-bold">L: <?= e($root['leftPoints']) ?> PV</span>
-                                <span class="text-amber-400 font-bold">R: <?= e($root['rightPoints']) ?> PV</span>
+                                <span class="text-blue-400 font-bold">L: <?= e($root['leftPoints']) ?> pts</span>
+                                <span class="text-amber-400 font-bold">R: <?= e($root['rightPoints']) ?> pts</span>
                             </div>
                         </div>
                         <div class="relative flex justify-center" style="padding-top:24px">
@@ -278,10 +284,11 @@
                         </div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
 
-        <!-- Network list -->
+        <!-- Team list -->
         <div class="space-y-4" data-tab-panel="list" data-group="net"<?= $sel === 'list' ? '' : ' hidden' ?>>
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div class="relative flex-1 max-w-md">
@@ -289,7 +296,7 @@
                     <input type="text" data-net-search aria-label="Search member by name, username or ID" placeholder="Search member by name, username or ID..." class="w-full pl-9 pr-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#f3bd35]">
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="text-xs text-zinc-400">Filter Leg:</span>
+                    <span class="text-xs text-zinc-400">Filter Team:</span>
                     <div class="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 text-xs">
                         <?php foreach (['all', 'left', 'right'] as $leg): ?>
                             <button type="button" data-net-leg-filter="<?= $leg ?>" data-on="<?= $legOn ?>" data-off="<?= $legOff ?>" aria-pressed="<?= $leg === 'all' ? 'true' : 'false' ?>" class="px-3 py-1 rounded-lg uppercase font-bold text-[10px] <?= $leg === 'all' ? $legOn : $legOff ?>"><?= $leg ?></button>
@@ -304,10 +311,10 @@
                             <tr>
                                 <th class="py-3 px-4">Account ID</th>
                                 <th class="py-3 px-4">Member Name</th>
-                                <th class="py-3 px-4">Leg Position</th>
+                                <th class="py-3 px-4">Team Position</th>
                                 <th class="py-3 px-4">Package</th>
-                                <th class="py-3 px-4">Left PV</th>
-                                <th class="py-3 px-4">Right PV</th>
+                                <th class="py-3 px-4">Left Points</th>
+                                <th class="py-3 px-4">Right Points</th>
                                 <th class="py-3 px-4">Entry Date</th>
                                 <th class="py-3 px-4">Status</th>
                             </tr>
@@ -338,14 +345,14 @@
             </div>
         </div>
 
-        <!-- Unilevel sponsorship tree -->
+        <!-- Referral tree -->
         <div class="space-y-4" data-tab-panel="unilevel" data-group="net"<?= $sel === 'unilevel' ? '' : ' hidden' ?>>
             <div class="p-4 rounded-3xl bg-[#121212] border border-zinc-800">
                 <h3 class="text-base font-bold text-white flex items-center gap-2">
                     <?= icon('folder-tree', 'w-5 h-5 text-[#f3bd35]') ?>
-                    Unilevel Sponsorship Generation Hierarchy
+                    Referral Tree Generation Hierarchy
                 </h3>
-                <p class="text-xs text-zinc-400 mt-0.5">Folder breakdown of personally enrolled frontliners (Generation 1) and their successive team depths.</p>
+                <p class="text-xs text-zinc-400 mt-0.5">Folder breakdown of your direct referrals (Generation 1) and their successive team depths.</p>
             </div>
             <div class="p-5 rounded-3xl bg-[#121212] border border-zinc-800 space-y-3">
                 <div class="p-3.5 rounded-2xl bg-zinc-950 border border-[#f3bd35]/40 flex items-center justify-between">
@@ -353,7 +360,7 @@
                         <span class="text-xs px-2 py-0.5 rounded-full bg-[#f3bd35] text-black font-extrabold text-[10px]">GEN 0</span>
                         <span class="font-bold text-white text-sm"><?= e($uni['fullName']) ?> (@<?= e($uni['username']) ?>)</span>
                     </div>
-                    <span class="text-xs text-[#ffda72] font-semibold"><?= e($uni['directsCount']) ?> Personally Sponsored Frontliners · <?= e($uni['totalTeamCount']) ?> Total Team</span>
+                    <span class="text-xs text-[#ffda72] font-semibold"><?= e($uni['directsCount']) ?> Direct Referrals ·<?= e($uni['totalTeamCount']) ?> Total Team</span>
                 </div>
                 <div class="pl-6 space-y-2.5 border-l-2 border-[#f3bd35]/20 ml-4">
                     <?php foreach ($uni['children'] as $g1):
@@ -387,7 +394,7 @@
                                     <span class="font-bold text-white"><?= e($g1['fullName']) ?> (@<?= e($g1['username']) ?>)</span>
                                 </div>
                                 <div class="text-zinc-400 text-[11px] flex items-center gap-3">
-                                    <span>Directs: <?= e($g1['directsCount']) ?></span>
+                                    <span>Referrals: <?= e($g1['directsCount']) ?></span>
                                     <span>Team: <?= e($g1['totalTeamCount']) ?></span>
                                     <span class="text-zinc-500"><?= e($g1['entryDate']) ?></span>
                                 </div>
@@ -403,33 +410,33 @@
 
 <script type="application/json" id="bo-net-nodes"><?= js_json($nodeData) ?></script>
 
-<!-- Downline registration (reference state f / ie / ae) -->
+<!-- Add Team Member (reference state f / ie / ae) -->
 <div data-modal="bo-net-register" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in" role="dialog" aria-modal="true" aria-labelledby="bo-net-register-title">
     <div class="w-full max-w-lg rounded-3xl bg-[#141414] border border-[#f3bd35]/40 p-6 shadow-2xl relative text-left max-h-[92vh] overflow-y-auto">
         <button type="button" data-close-modal aria-label="Close" class="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-full"><?= icon('x', 'w-5 h-5') ?></button>
         <div class="mb-4">
             <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#f3bd35]/15 border border-[#f3bd35]/30 text-[#f3bd35] text-[10px] font-bold uppercase tracking-wider mb-1">
                 <?= icon('user-plus', 'w-3.5 h-3.5') ?>
-                Binary Downline Placement
+                Team Member Placement
             </div>
             <h3 id="bo-net-register-title" class="text-xl font-bold text-white">Enroll New Member</h3>
-            <p class="text-xs text-zinc-400 mt-0.5">Placing under <strong class="text-white" data-reg-node></strong> on the <strong class="text-[#ffda72] uppercase font-bold" data-reg-leg>left leg</strong>.</p>
+            <p class="text-xs text-zinc-400 mt-0.5">Placing under <strong class="text-white" data-reg-node></strong> on the <strong class="text-[#ffda72] uppercase font-bold" data-reg-leg>left team</strong>.</p>
         </div>
         <div data-reg-success hidden class="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs text-center space-y-2" role="status">
             <?= icon('circle-check', 'w-8 h-8 text-emerald-400 mx-auto') ?>
             <p class="font-bold" data-reg-success-msg></p>
-            <p class="text-[11px] text-zinc-400">Genealogy tree and commissions updated automatically.</p>
+            <p class="text-[11px] text-zinc-400">Team tree and rewards updated automatically.</p>
         </div>
         <form data-reg-form class="space-y-4 text-xs">
             <div data-reg-error hidden role="alert" class="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs"></div>
             <div class="p-3 rounded-2xl bg-zinc-950 border border-[#f3bd35]/30 text-[11px] space-y-1">
                 <div class="flex justify-between font-bold text-white">
-                    <span>Direct Referral Bonus:</span>
+                    <span>Referral Bonus:</span>
                     <span class="text-emerald-400 font-mono">+₱<?= number_format($complan['directReferralBonus'], 2) ?> PHP</span>
                 </div>
                 <div class="flex justify-between font-bold text-white">
-                    <span>Binary Match Potential:</span>
-                    <span class="text-[#ffda72] font-mono">+₱<?= number_format($complan['pairingBonus'], 2) ?> PHP (if opposite leg has points)</span>
+                    <span>Match Bonus Potential:</span>
+                    <span class="text-[#ffda72] font-mono">+₱<?= number_format($complan['pairingBonus'], 2) ?> PHP (if opposite team has points)</span>
                 </div>
                 <div class="text-[10px] text-zinc-500 pt-1 border-t border-zinc-800">Package Cost: ₱2,000.00 (Consumed via selected activation code).</div>
             </div>
@@ -437,9 +444,9 @@
                 <label for="bo-reg-placement" class="block text-zinc-300 font-semibold mb-1">Placement *</label>
                 <?php // bo-network.js adds each leg's downline count to the option labels. ?>
                 <select id="bo-reg-placement" name="placement" required class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white focus:outline-none focus:border-[#f3bd35]">
-                    <option value="auto" selected>Auto: leg with fewer downlines</option>
-                    <option value="left">Left leg</option>
-                    <option value="right">Right leg</option>
+                    <option value="auto" selected>Auto: team with fewer members</option>
+                    <option value="left">Left team</option>
+                    <option value="right">Right team</option>
                 </select>
                 <p class="text-[10px] text-zinc-500 mt-2" data-reg-hint></p>
             </div>
@@ -464,7 +471,7 @@
                 <?php endif; ?>
             </div>
             <div class="pt-2">
-                <button type="submit" disabled data-reg-submit data-has-codes="<?= $unused ? '1' : '0' ?>" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs shadow-lg transition-transform active:scale-95 disabled:opacity-50">Confirm &amp; Place Downline</button>
+                <button type="submit" disabled data-reg-submit data-has-codes="<?= $unused ? '1' : '0' ?>" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs shadow-lg transition-transform active:scale-95 disabled:opacity-50">Confirm &amp; Place Team Member</button>
             </div>
         </form>
     </div>
@@ -485,7 +492,7 @@
                 <span class="text-white font-medium" data-nd="package"></span>
             </div>
             <div class="flex justify-between">
-                <span class="text-zinc-400">Leg Placement:</span>
+                <span class="text-zinc-400">Team Placement:</span>
                 <span class="text-[#ffda72] font-bold uppercase" data-nd="position"></span>
             </div>
             <div class="flex justify-between">

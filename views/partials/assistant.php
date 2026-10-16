@@ -20,7 +20,7 @@ $asProvider = ai_provider('chat');
             <div class="w-9 h-9 rounded-full bg-[#f3bd35]/15 text-[#ffda72] flex items-center justify-center shrink-0"><?= icon('sparkles', 'w-4 h-4') ?></div>
             <div class="flex-1 min-w-0">
                 <h2 id="evo-assistant-title" class="text-sm font-bold text-white">88MMM Assistant</h2>
-                <p class="text-[10px] text-zinc-400 truncate">Ask about the compensation plan, joining, codes or the portal</p>
+                <p class="text-[10px] text-zinc-400 truncate">Ask about the rewards plan, joining, codes or the portal</p>
             </div>
             <button type="button" data-assistant-reset title="New chat" aria-label="Start a new chat" class="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"><?= icon('rotate-ccw', 'w-4 h-4') ?></button>
             <button type="button" data-assistant-close title="Close" aria-label="Close the assistant" class="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"><?= icon('x', 'w-4 h-4') ?></button>
@@ -29,7 +29,7 @@ $asProvider = ai_provider('chat');
         <?php if (!$assistantOn): ?>
             <div class="evo-assistant-log px-4 py-4 text-xs text-zinc-300 space-y-2">
                 <p class="font-semibold text-amber-200">The 88MMM Assistant is off, so members and visitors don't see this button.</p>
-                <p>It uses <?= e(AI_PROVIDERS[$asProvider]) ?> (<span class="font-mono">ai.chat_provider</span> in config/config.php). To turn it on, add the API key in config/config.php: <span class="font-mono text-zinc-200">'ai' =&gt; ['<?= e($asProvider) ?>' =&gt; ['api_key' =&gt; '<?= $asProvider === 'groq' ? 'gsk_…' : 'sk-ant-…' ?>']]</span>.</p>
+                <p>It uses <?= e(AI_PROVIDERS[$asProvider]) ?> (<span class="font-mono">ai.chat_provider</span> in config/config.php), and <?= e(AI_PROVIDERS[$asProvider === 'groq' ? 'anthropic' : 'groq']) ?> answers when that one can't. To turn it on, add either API key in config/config.php: <span class="font-mono text-zinc-200">'ai' =&gt; ['anthropic' =&gt; ['api_key' =&gt; 'sk-ant-…']]</span> or <span class="font-mono text-zinc-200">['groq' =&gt; ['api_key' =&gt; 'gsk_…']]</span>.</p>
                 <p class="text-zinc-500">Only administrators see this message.</p>
             </div>
         <?php else: ?>

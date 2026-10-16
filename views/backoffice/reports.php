@@ -106,13 +106,13 @@
         }
         return $out;
     };
-    $incomeBars = fn (array $rows) => $bars($rows, fn ($t) => peso($t), fn ($v) => 'Pairing: ' . peso($v), fn ($v) => 'Direct: ' . peso($v));
+    $incomeBars = fn (array $rows) => $bars($rows, fn ($t) => peso($t), fn ($v) => 'Match: ' . peso($v), fn ($v) => 'Referral: ' . peso($v));
     $networkBars = fn (array $rows) => $bars($rows, fn ($t) => '+' . $t . ' Members', fn ($v) => 'Left: +' . $v, fn ($v) => 'Right: +' . $v);
 
     $demoIncomeSet = [
         'demo' => true,
         'bars' => $incomeBars(array_map(fn ($d) => [$d['day'], $d['pairing'], $d['direct']], $demoIncome)),
-        'high' => 'Saturday (₱3,400)', 'highSub' => '8 Pairs matched (Max cycle safety cap hit)', 'avg' => '₱2,670 / day',
+        'high' => 'Saturday (₱3,400)', 'highSub' => '8 Matches made (Max round safety cap hit)', 'avg' => '₱2,670 / day',
     ];
     $demoNetworkSet = [
         'demo' => true,
@@ -159,10 +159,10 @@
             if ($best) {
                 $pairs = (int) floor($best['pairing'] / $complan['pairingBonus']);
                 $high = date($p['dayName'], strtotime($best['day'])) . ' (' . peso($best['total']) . ')';
-                $highSub = $pairs . ' Pairs matched' . ($pairs >= $complan['maxPairsPerCycle'] ? ' (Max cycle safety cap hit)' : '');
+                $highSub = $pairs . ' Matches made' . ($pairs >= $complan['maxPairsPerCycle'] ? ' (Max round safety cap hit)' : '');
             } else {
                 $high = '— (₱0)';
-                $highSub = '0 Pairs matched';
+                $highSub = '0 Matches made';
             }
             $data['income'][$pid][$filter] = [
                 'demo' => false, 'bars' => $incomeBars($rows), 'high' => $high, 'highSub' => $highSub,
@@ -229,11 +229,11 @@
         <div class="flex items-center gap-2" data-tab-group="rep" data-param="report" role="tablist">
             <button type="button" data-tab="income" data-group="rep" data-on="<?= $typeOn ?>" data-off="<?= $typeOff ?>" aria-selected="<?= $report === 'income' ? 'true' : 'false' ?>" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all <?= $report === 'income' ? $typeOn : $typeOff ?>">
                 <?= icon('dollar-sign', 'w-4 h-4') ?>
-                <span>Income &amp; Complan Report</span>
+                <span>Income &amp; Rewards Plan Report</span>
             </button>
             <button type="button" data-tab="network" data-group="rep" data-on="<?= $typeOn ?>" data-off="<?= $typeOff ?>" aria-selected="<?= $report === 'network' ? 'true' : 'false' ?>" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all <?= $report === 'network' ? $typeOn : $typeOff ?>">
                 <?= icon('users', 'w-4 h-4') ?>
-                <span>Network Growth Report</span>
+                <span>Team Growth Report</span>
             </button>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
@@ -243,7 +243,7 @@
                 <?php endforeach; ?>
             </div>
             <div class="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 text-xs" data-rep-filters<?= $report === 'income' ? '' : ' hidden' ?>>
-                <?php foreach (['all' => 'All', 'pairing' => 'Pairing (₱' . num($complan['pairingBonus']) . ')', 'direct' => 'Direct (₱' . num($complan['directReferralBonus']) . ')'] as $fid => $flabel): ?>
+                <?php foreach (['all' => 'All', 'pairing' => 'Match (₱' . num($complan['pairingBonus']) . ')', 'direct' => 'Referral (₱' . num($complan['directReferralBonus']) . ')'] as $fid => $flabel): ?>
                     <button type="button" data-rep-filter="<?= $fid ?>" data-on="<?= $filterOn ?>" data-off="<?= $filterOff ?>" aria-pressed="<?= $fid === 'all' ? 'true' : 'false' ?>" class="px-2.5 py-1 rounded-lg uppercase text-[10px] font-bold <?= $fid === 'all' ? $filterOn : $filterOff ?>"><?= $flabel ?></button>
                 <?php endforeach; ?>
             </div>
@@ -257,14 +257,14 @@
                     <div>
                         <h3 class="text-base font-bold text-white flex items-center gap-2">
                             <?= icon('chart-column', 'w-5 h-5 text-[#f3bd35]') ?>
-                            Commissions &amp; Earnings Trend Graph
+                            Rewards &amp; Earnings Trend Graph
                         </h3>
-                        <p class="text-xs text-zinc-400 mt-0.5">Daily visual performance breakdown of Binary Matches vs Direct Referrals.</p>
+                        <p class="text-xs text-zinc-400 mt-0.5">Daily visual performance breakdown of Team Matches vs Direct Referrals.</p>
                     </div>
                     <div class="flex items-center gap-4 text-xs font-semibold">
                         <div class="flex items-center gap-1.5">
                             <span class="w-3 h-3 rounded-full bg-[#f3bd35]"></span>
-                            <span class="text-zinc-300">Pairing Matches (₱<?= num($complan['pairingBonus']) ?>)</span>
+                            <span class="text-zinc-300">Team Matches (₱<?= num($complan['pairingBonus']) ?>)</span>
                         </div>
                         <div class="flex items-center gap-1.5">
                             <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
@@ -284,12 +284,12 @@
                     <div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
                         <span class="text-[11px] text-zinc-400 font-medium">Average Daily Payout</span>
                         <div class="text-xl font-bold text-[#ffda72] font-mono mt-1" data-rep="avg"><?= e($income['avg']) ?></div>
-                        <span class="text-[10px] text-zinc-400">Consistent multi-cycle matching</span>
+                        <span class="text-[10px] text-zinc-400">Consistent multi-round matching</span>
                     </div>
                     <div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
-                        <span class="text-[11px] text-zinc-400 font-medium">Lifetime Pairing Total</span>
+                        <span class="text-[11px] text-zinc-400 font-medium">Lifetime Match Total</span>
                         <div class="text-xl font-bold text-white font-mono mt-1"><?= peso($account['totalPairingBonus']) ?> PHP</div>
-                        <span class="text-[10px] text-zinc-400"><?= e(round($account['totalPairingBonus'] / $complan['pairingBonus'])) ?> Total binary pairs matched</span>
+                        <span class="text-[10px] text-zinc-400"><?= e(round($account['totalPairingBonus'] / $complan['pairingBonus'])) ?> Total team matches made</span>
                     </div>
                 </div>
             </div>
@@ -301,7 +301,7 @@
                     <div>
                         <h3 class="text-base font-bold text-white flex items-center gap-2">
                             <?= icon('users', 'w-5 h-5 text-blue-400') ?>
-                            Network Expansion &amp; Leg Balance Graph
+                            Team Expansion &amp; Balance Graph
                         </h3>
                         <p class="text-xs text-zinc-400 mt-0.5">Comparison of new member additions on Left Team vs Right Team.</p>
                     </div>
@@ -323,7 +323,7 @@
                     <div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
                         <span class="text-[11px] text-zinc-400 font-medium">Team Ratio Balance</span>
                         <div class="text-xl font-bold text-emerald-400 font-mono mt-1">1 : <?= number_format($ratio, 2) ?> (Optimal)</div>
-                        <span class="text-[10px] text-zinc-400">High pairing conversion efficiency</span>
+                        <span class="text-[10px] text-zinc-400">High match conversion efficiency</span>
                     </div>
                     <div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
                         <span class="text-[11px] text-zinc-400 font-medium">Weekly Growth Count</span>
@@ -331,9 +331,9 @@
                         <span class="text-[10px] text-blue-400" data-rep="growthSub"><?= e($network['growthSub']) ?></span>
                     </div>
                     <div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
-                        <span class="text-[11px] text-zinc-400 font-medium">Pairing Utilization</span>
+                        <span class="text-[11px] text-zinc-400 font-medium">Match Utilization</span>
                         <div class="text-xl font-bold text-[#ffda72] font-mono mt-1">94.2% Matched</div>
-                        <span class="text-[10px] text-zinc-400">Minimal flush waste under 8/cycle cap</span>
+                        <span class="text-[10px] text-zinc-400">Little lost to the 8/round cap</span>
                     </div>
                 </div>
             </div>

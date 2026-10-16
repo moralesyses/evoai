@@ -1,7 +1,7 @@
 <?php
 /**
  * Modals of the public card: QR code, share, send vCard and membership
- * application. Expects $name, $shareUrl, $cms from views/card.php.
+ * application. Expects $name, $shareUrl, $qrUrl (the QR code's 1EVOAI card address), $cms from views/card.php.
  */
 $shareTargets = [
     ['WhatsApp', 'message-circle', 'bg-emerald-600', 'whatsapp'],
@@ -24,9 +24,9 @@ $leadInput = 'w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 tex
             <p class="text-xs text-zinc-400 mt-1"><?= e($name) ?> · 88MMM Circle</p>
         </div>
         <div class="p-4 bg-white rounded-2xl mx-auto shadow-inner flex flex-col items-center justify-center my-4">
-            <svg id="public-qr-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-48 h-48" role="img" aria-label="QR code for <?= e($shareUrl) ?>"></svg>
+            <svg id="public-qr-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-48 h-48" role="img" aria-label="QR code for <?= e($qrUrl) ?>"></svg>
         </div>
-        <p class="text-[11px] text-zinc-400 mb-5 break-all font-mono"><?= e($shareUrl) ?></p>
+        <p class="text-[11px] text-zinc-400 mb-5 break-all font-mono"><?= e($qrUrl) ?></p>
         <button type="button" id="qr-download" class="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-bold text-xs rounded-xl shadow-lg hover:brightness-105 active:scale-95 transition-transform"><?= icon('download', 'w-4 h-4') ?>Download QR Image</button>
     </div>
 </div>
@@ -81,7 +81,7 @@ $leadInput = 'w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 tex
             <p class="text-xs text-zinc-300 leading-relaxed max-w-sm mx-auto mb-6">Your application for <span class="text-[#f3bd35] font-semibold" data-join-tier-name>Executive Member</span> has been registered directly in Mike Maranan's executive ledger.</p>
             <div class="space-y-2">
                 <button type="button" data-join-pay class="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs rounded-xl shadow-lg">
-                    <?= icon('credit-card', 'w-4 h-4 text-emerald-200') ?><span>⚡ Pay <span data-join-price></span> Online Now (Instant Activation)</span>
+                    <?= icon('credit-card', 'w-4 h-4 text-emerald-200') ?><span>Sign Up Now (<span data-join-price></span>): Maya or Activation Code</span>
                 </button>
                 <a href="<?= e(url('chat')) ?>" class="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black font-bold text-xs rounded-xl shadow-lg"><span>Open Secure E2EE Chat Now</span><?= icon('arrow-right', 'w-4 h-4') ?></a>
                 <button type="button" data-close-modal class="w-full py-2.5 bg-zinc-800 text-zinc-300 font-semibold text-xs rounded-xl">Done</button>
@@ -136,11 +136,11 @@ $leadInput = 'w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 tex
                 <div class="pt-2">
                     <div class="relative flex py-1.5 items-center">
                         <div class="flex-grow border-t border-zinc-800"></div>
-                        <span class="flex-shrink mx-2 text-[10px] uppercase font-bold text-zinc-500">or pay online immediately</span>
+                        <span class="flex-shrink mx-2 text-[10px] uppercase font-bold text-zinc-500">or sign up now</span>
                         <div class="flex-grow border-t border-zinc-800"></div>
                     </div>
                     <button type="button" data-join-pay class="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95">
-                        <?= icon('credit-card', 'w-3.5 h-3.5 text-emerald-200') ?><span>⚡ Pay <span data-join-price>₱<?= num($cms['executivePrice']) ?></span> Online with Maya</span>
+                        <?= icon('credit-card', 'w-3.5 h-3.5 text-emerald-200') ?><span>Sign Up Now (<span data-join-price>₱<?= num($cms['executivePrice']) ?></span>): Maya or Activation Code</span>
                     </button>
                 </div>
             </form>

@@ -1,8 +1,6 @@
-/* Main Portal: executive sign-in, registration, demo access, password recovery. */
+/* Main Portal: executive sign-in, registration, password recovery. */
 (function () {
   'use strict';
-  var page = window.EVO_PAGE || {};
-  var demoUsers = page.demoUsers || [];
 
   var loginForm = document.getElementById('login-form');
   var registerForm = document.getElementById('register-form');
@@ -28,9 +26,6 @@
     var btn = loginForm.querySelector('button[type=submit]');
     btn.disabled = on;
     btn.innerHTML = on ? spinner : submitIdle;
-    EVO.qsa('[data-demo-login]').forEach(function (b) {
-      b.disabled = on;
-    });
   }
 
   function afterLogin(user) {
@@ -66,24 +61,6 @@
       });
     });
   }
-
-  // One-click demo credentials and "Sign in as …" buttons.
-  document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-demo-login]');
-    if (!b) return;
-    ev.preventDefault();
-    var d = demoUsers[Number(b.getAttribute('data-demo-login'))];
-    if (!d) return;
-    EVO.activateTab('auth', 'login');
-    document.getElementById('login-email').value = d.email;
-    document.getElementById('login-password').value = d.password;
-    doLogin(d.email, d.password, true, function () {
-      show(okBox, 'Signed in as ' + d.name + ' (' + d.roleLabel + ').');
-      setTimeout(function () {
-        EVO.go(d.role === 'admin' ? 'admin' : 'backoffice');
-      }, 500);
-    });
-  });
 
   // Hero "Executive Sign In" button.
   var heroSignin = document.getElementById('hero-signin');

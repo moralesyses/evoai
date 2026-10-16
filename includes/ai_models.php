@@ -23,6 +23,21 @@ final class AiEmailDraft implements StructuredOutputModel
     public string $body;
 }
 
+/**
+ * An 88MMM Assistant answer: whether the question is about 88MMM Circle and this portal, then the answer.
+ * The server shows a fixed refusal instead of the reply when onTopic is false (includes/assistant.php).
+ */
+final class AiChatReply implements StructuredOutputModel
+{
+    use StructuredOutputModelTrait;
+
+    #[Constrained(description: 'true only when the message is about 88MMM Circle or this portal (see SCOPE); false for anything else')]
+    public bool $onTopic;
+
+    #[Constrained(description: 'The answer to show the person when onTopic is true; an empty string when onTopic is false')]
+    public string $reply;
+}
+
 /** A personal follow-up draft plus a tip for the member. */
 final class AiFollowUpDraft implements StructuredOutputModel
 {

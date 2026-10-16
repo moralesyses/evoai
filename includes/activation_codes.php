@@ -188,13 +188,37 @@ function admin_check_code(string $code, ?string $pin): ?array
     ];
 }
 
+/** 123 for "SN-000123", "SN000123", "000123" or "123"; null for anything else. */
+function code_serial_parse(string $text): ?int
+{
+    return preg_match('/^(?:SN-?)?0*(\d{1,9})$/i', trim($text), $m) ? (int) $m[1] : null;
+}
+
+/**
+ * The code logs' serial range from what was typed in "Serial from" and "to"
+ * (either may be empty for an open end). A reversed range is put the right
+ * way round. Returns [from|null, to|null, error message|null].
+ */
+function code_serial_range(string $from, string $to): array
+{
+    $a = trim($from) === '' ? null : code_serial_parse($from);
+    $b = trim($to) === '' ? null : code_serial_parse($to);
+    if ((trim($from) !== '' && $a === null) || (trim($to) !== '' && $b === null)) {
+        return [null, null, 'Type serials like SN-000001, or just the number (1).'];
+    }
+    if ($a !== null && $b !== null && $a > $b) {
+        [$a, $b] = [$b, $a];
+    }
+    return [$a, $b, null];
+}
+
 /**
  * One page of the code logs, newest first. Filters: q (serial, code, owner
- * ID/username/name, used by), status, package.
+ * ID/username/name, used by), status, package, serial range (from / to).
  */
-function admin_list_codes(string $q, string $status, string $package, int $page): array
+function admin_list_codes(string $q, string $status, string $package, int $page, ?int $from = null, ?int $to = null): array
 {
-    [$sql, $params] = admin_code_filter($q, $status, $package);
+    [$sql, $params] = admin_code_filter($q, $status, $package, $from, $to);
     $total = (int) db_value("SELECT COUNT(*) $sql", $params);
     $offset = (max(1, $page) - 1) * CODES_PER_PAGE;
     $rows = db_all("SELECT c.serial, c.code, c.pin, c.package, c.value, c.status, c.used_by, c.used_at, c.generated_date, c.issued_by,
@@ -205,14 +229,18 @@ function admin_list_codes(string $q, string $status, string $package, int $page)
 
 /**
  * The code logs as a CSV file for download: the selected codes, or every code
- * matching the logs filters ($filter = ['q', 'status', 'package']). The file
- * holds PINs, so each download is written to the audit log.
+ * matching the logs filters ($filter = ['q', 'status', 'package', 'from', 'to']).
+ * The file holds PINs, so each download is written to the audit log.
  * Returns ['csv' => text, 'count' => n, 'filename' => name].
  */
 function admin_export_codes(array $admin, array $codes, ?array $filter = null): array
 {
     if ($filter !== null) {
-        [$sql, $params] = admin_code_filter(str_in($filter, 'q', 100), str_in($filter, 'status', 20), str_in($filter, 'package', 40));
+        [$from, $to, $error] = code_serial_range(str_in($filter, 'from', 20), str_in($filter, 'to', 20));
+        if ($error !== null) {
+            throw new InvalidArgumentException($error);
+        }
+        [$sql, $params] = admin_code_filter(str_in($filter, 'q', 100), str_in($filter, 'status', 20), str_in($filter, 'package', 40), $from, $to);
     } else {
         $codes = array_values(array_unique(array_filter(array_map(fn ($c) => strtoupper(trim((string) $c)), $codes), fn ($c) => $c !== '' && strlen($c) <= 40)));
         if (!$codes) {
@@ -253,9 +281,10 @@ function admin_export_codes(array $admin, array $codes, ?array $filter = null): 
 
 /**
  * FROM/WHERE for the code logs filters, as [sql, params]. The WHERE clause is
- * always present, so callers can add "AND …".
+ * always present, so callers can add "AND …". $from / $to: serial range
+ * (inclusive; null for an open end), as code_serial_range() returns it.
  */
-function admin_code_filter(string $q, string $status, string $package): array
+function admin_code_filter(string $q, string $status, string $package, ?int $from = null, ?int $to = null): array
 {
     $where = ['1 = 1'];
     $params = [];
@@ -273,6 +302,14 @@ function admin_code_filter(string $q, string $status, string $package): array
         $where[] = 'c.package = ?';
         $params[] = $package;
     }
+    if ($from !== null) {
+        $where[] = 'c.serial >= ?';
+        $params[] = $from;
+    }
+    if ($to !== null) {
+        $where[] = 'c.serial <= ?';
+        $params[] = $to;
+    }
     $sql = 'FROM mlm_codes c JOIN mlm_accounts a ON a.id = c.owner_account_id JOIN users o ON o.id = a.user_id'
         . ' LEFT JOIN users u ON u.id = c.used_by_user_id'
         . ' WHERE ' . implode(' AND ', $where);
@@ -280,9 +317,9 @@ function admin_code_filter(string $q, string $status, string $package): array
 }
 
 /** Every unused code matching the code logs filters ("select all matching"). */
-function admin_matching_codes(string $q, string $status, string $package): array
+function admin_matching_codes(string $q, string $status, string $package, ?int $from = null, ?int $to = null): array
 {
-    [$sql, $params] = admin_code_filter($q, $status, $package);
+    [$sql, $params] = admin_code_filter($q, $status, $package, $from, $to);
     return array_column(db_all("SELECT c.code $sql AND c.status <> 'used'", $params), 'code');
 }
 
@@ -385,7 +422,7 @@ function signup_with_code(array $in): array
                 return 'This activation code has already been used.';
             }
             if ($row['status'] !== 'active') {
-                return 'This activation code isn\'t active yet. Ask your sponsor or the 88MMM administrator to activate it.';
+                return 'This activation code isn\'t active yet. Ask your referrer or the 88MMM administrator to activate it.';
             }
             if ($row['package'] !== $reg['package']) {
                 return 'This is a ' . code_package_label($row['package']) . ' code. Select the ' . code_package_label($row['package']) . ' package to use it.';

@@ -28,9 +28,9 @@
     var cycles = int('cyclesPerDay');
     var bonus = int('pairingBonus');
     out('pairsPerDay', pairs * cycles);
-    out('pairsFormula', '(' + pairs + ' pairs × ' + cycles + ' cycle' + (cycles === 1 ? '' : 's') + ')');
+    out('pairsFormula', '(' + pairs + ' matches × ' + cycles + ' round' + (cycles === 1 ? '' : 's') + ')');
     out('direct', peso(int('directReferralBonus')));
-    out('pairing', peso(bonus) + ' per pair');
+    out('pairing', peso(bonus) + ' per match');
     out('perCycle', peso(pairs * bonus));
     out('perDay', peso(pairs * cycles * bonus));
   }

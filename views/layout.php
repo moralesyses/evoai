@@ -12,9 +12,14 @@ $navItems = [
     'admin'      => ['icon' => 'shield', 'label' => 'Management Admin', 'short' => 'Admin', 'bottom' => 'Admin'],
     'chat'       => ['icon' => 'message-square-lock', 'label' => 'E2EE Chat', 'short' => 'Chat', 'bottom' => 'E2EE'],
 ];
+// Management Admin is only in the menus of admins; members and visitors don't see it.
+if (!$user || !is_admin($user)) {
+    unset($navItems['admin']);
+}
 $navOn = 'bg-gradient-to-r from-[#ffda72] to-[#f3bd35] text-black shadow-md';
 $navOff = 'text-zinc-400 hover:text-white';
-$canSwitch = $user && (demo_mode() || is_admin($user));
+// The header account switcher (a list of every member) is a demo-mode convenience only: never in production.
+$canSwitch = $user && demo_mode();
 $switchUsers = $canSwitch ? db_all("SELECT id, name, role, title FROM users WHERE status = 'active' AND role <> 'visitor' ORDER BY created_at, id") : [];
 $jsConfig = [
     'csrf' => csrf_token(),
@@ -52,7 +57,8 @@ $jsConfig = [
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Mike Maranan">
+    <?php /* The name under the icon when a page is added to an iPhone's home screen: a card's own person. */ ?>
+    <meta name="apple-mobile-web-app-title" content="<?= e($pageMeta['title'] ?? 'Mike Maranan') ?>">
     <meta name="theme-color" content="#090909">
 <?php if (!empty($pageMeta['favicon'])): /* e.g. the We Serve emblem on digital cards */ ?>
     <link rel="icon" type="image/png" sizes="32x32" href="<?= e($pageMeta['favicon']) ?>">
@@ -81,18 +87,20 @@ $jsConfig = [
                     </div>
                 </a>
             </div>
+            <?php if ($user): /* Visitors who haven't signed in get no menus: just the logo and Sign In. */ ?>
             <nav class="flex items-center gap-1 p-1 bg-[#121212] rounded-2xl border border-[#f3bd35]/30" aria-label="Primary">
                 <?php foreach ($navItems as $key => $item): ?>
                     <a href="<?= e(url($key)) ?>"<?= $view === $key ? ' aria-current="page"' : '' ?> class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all <?= $view === $key ? $navOn : $navOff ?>">
                         <?= icon($item['icon'], 'w-3.5 h-3.5') ?>
                         <span class="hidden sm:inline"><?= e($item['label']) ?></span>
                         <span class="sm:hidden"><?= e($item['short']) ?></span>
-                        <?php if ($key === 'admin' && $user && $user['role'] === 'admin'): ?>
+                        <?php if ($key === 'admin'): ?>
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline"></span>
                         <?php endif; ?>
                     </a>
                 <?php endforeach; ?>
             </nav>
+            <?php endif; ?>
             <div class="flex items-center gap-2">
                 <button type="button" id="pwa-ios" hidden data-open-modal="ios-install" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#f3bd35] border border-[#f3bd35]/40 hover:bg-[#f3bd35]/10 active:scale-95 transition-all rounded-lg whitespace-nowrap">
                     <?= icon('smartphone', 'w-3.5 h-3.5') ?><span>Add to iOS</span>
@@ -108,8 +116,9 @@ $jsConfig = [
                         <div data-dropdown-menu hidden class="absolute right-0 mt-2 w-64 rounded-2xl bg-[#141414] border border-[#f3bd35]/30 shadow-2xl p-2 z-50 animate-fadeIn">
                             <?php if ($canSwitch): ?>
                                 <div class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Switch Active Account</div>
+                                <div class="evo-switch-list">
                                 <?php foreach ($switchUsers as $su): ?>
-                                    <button type="button" <?= $su['id'] === $user['id'] ? '' : 'data-switch-user="' . e($su['id']) . '"' ?> class="w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors <?= $su['id'] === $user['id'] ? 'bg-[#f3bd35]/15 text-[#ffda72]' : 'hover:bg-zinc-800 text-zinc-200' ?>">
+                                    <button type="button" <?= $su['id'] === $user['id'] ? 'aria-current="true"' : 'data-switch-user="' . e($su['id']) . '"' ?> class="w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors <?= $su['id'] === $user['id'] ? 'bg-[#f3bd35]/15 text-[#ffda72]' : 'hover:bg-zinc-800 text-zinc-200' ?>">
                                         <div>
                                             <div class="font-semibold flex items-center gap-1.5">
                                                 <?= e($su['name']) ?>
@@ -120,6 +129,7 @@ $jsConfig = [
                                         <?php if ($su['id'] === $user['id']): ?><?= icon('check', 'w-3.5 h-3.5 text-[#f3bd35]') ?><?php endif; ?>
                                     </button>
                                 <?php endforeach; ?>
+                                </div>
                             <?php endif; ?>
                             <div class="<?= $canSwitch ? 'mt-2 pt-2 border-t border-zinc-800' : '' ?>">
                                 <button type="button" data-logout class="w-full flex items-center gap-2 p-2 rounded-xl text-left text-xs text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors">
@@ -140,6 +150,7 @@ $jsConfig = [
             <?= $content ?>
         </main>
 
+        <?php if ($user): ?>
         <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0d0d0d]/95 backdrop-blur-md border-t border-[#f3bd35]/20 px-2 py-1.5 flex items-center justify-around" aria-label="Mobile">
             <?php foreach ($navItems as $key => $item): ?>
                 <a href="<?= e(url($key)) ?>" class="flex flex-col items-center justify-center min-w-[50px] min-h-[44px] transition-colors <?= $view === $key ? 'text-[#f3bd35]' : 'text-zinc-400' ?>">
@@ -148,6 +159,7 @@ $jsConfig = [
                 </a>
             <?php endforeach; ?>
         </nav>
+        <?php endif; ?>
     </div>
 </div>
 

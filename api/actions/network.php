@@ -17,7 +17,7 @@ return [
         $user = api_user();
         $id = str_in($in, 'id', 20);
         if ($id === '' || !mlm_can_view_node($user, $id)) {
-            api_fail('That member isn\'t in your network.', 403);
+            api_fail('That member isn\'t in your team.', 403);
         }
         return mlm_genealogy_children($id);
     },

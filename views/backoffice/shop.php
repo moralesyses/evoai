@@ -47,11 +47,11 @@ $subOff = 'text-zinc-400 hover:text-white';
 // The member's own balance, or Maya (card or Maya wallet on Maya's page): no other way to pay.
 $shopMayaOn = maya_enabled();
 $payMethods = [
-    'balance' => ['on' => 'bg-[#18140c] border-[#f3bd35] text-[#ffda72] font-bold', 'icon' => 'wallet', 'iconCls' => 'w-4 h-4 mx-auto mb-1 text-[#f3bd35]', 'label' => 'MLM Balance (' . peso($account['availableBalance']) . ')'],
-    'maya'    => ['on' => 'bg-emerald-950/40 border-emerald-500 text-emerald-300 font-bold', 'icon' => 'credit-card', 'iconCls' => 'w-4 h-4 mx-auto mb-1 text-emerald-400', 'label' => $shopMayaOn ? 'Maya (card or wallet)' : 'Maya (not available yet)'],
+    'balance' => ['on' => 'bg-[#18140c] border-[#f3bd35] text-[#ffda72] font-bold', 'icon' => 'wallet', 'iconCls' => 'w-4 h-4 mx-auto mb-1 text-[#f3bd35]', 'label' => 'Wallet Balance (' . peso($account['availableBalance']) . ')'],
+    'maya'    => ['on' => 'bg-emerald-950/40 border-emerald-500 text-emerald-300 font-bold', 'icon' => 'credit-card', 'iconCls' => 'w-4 h-4 mx-auto mb-1 text-emerald-400', 'label' => $shopMayaOn ? 'Maya (card or wallet)' : 'Maya (' . lcfirst(MAYA_UNAVAILABLE) . ')'],
 ];
 $payOff = 'bg-zinc-900 border-zinc-800 text-zinc-400';
-$defaultAddress = 'Unit 88 Penthouse, Maranan Tower, Bonifacio Global City, Taguig';
+$defaultAddress = '6th floor Frabelle Alabang Building, Madrigal Business Park, Ayala Alabang, Muntinlupa City, Metro Manila';
 ?>
 <div class="space-y-6" id="bo-shop">
     <div class="flex items-center justify-between p-1.5 bg-[#121212] rounded-2xl border border-zinc-800 text-xs">
@@ -119,7 +119,7 @@ $defaultAddress = 'Unit 88 Penthouse, Maranan Tower, Bonifacio Global City, Tagu
             <div>
                 <h3 class="text-base font-bold text-white flex items-center gap-2">
                     <?= icon('shopping-bag', 'w-5 h-5 text-[#f3bd35]') ?>
-                    88MMM Executive Shop &amp; Product Points (PV)
+                    88MMM Executive Shop &amp; Product Points
                 </h3>
                 <p class="text-xs text-zinc-400 mt-0.5">
                     Order executive activation packages, replacement smart NFC hardware, and re-order health supplements with member discount pricing.
@@ -133,7 +133,7 @@ $defaultAddress = 'Unit 88 Penthouse, Maranan Tower, Bonifacio Global City, Tagu
                         <div class="h-44 w-full bg-zinc-950 overflow-hidden relative">
                             <img src="<?= e($p['image']) ?>" alt="<?= e($p['name']) ?>" referrerpolicy="no-referrer" loading="lazy" class="w-full h-full object-cover hover:scale-105 transition-transform duration-300">
                             <div class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/80 backdrop-blur-md border border-[#f3bd35]/40 text-[#ffda72] text-[10px] font-mono font-bold">
-                                +<?= (int) $p['points'] ?> PV
+                                +<?= (int) $p['points'] ?> pts
                             </div>
                             <div class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-zinc-900/90 text-zinc-300 text-[9px] uppercase font-bold">
                                 <?= e($p['category']) ?>
@@ -186,7 +186,7 @@ $defaultAddress = 'Unit 88 Penthouse, Maranan Tower, Bonifacio Global City, Tagu
                                     <div>
                                         <div class="font-bold text-white"><?= e($cp['name']) ?></div>
                                         <div class="text-[10px] text-zinc-400">
-                                            <?= peso($cp['memberPrice']) ?> · +<?= (int) $cp['points'] ?> PV each
+                                            <?= peso($cp['memberPrice']) ?> · +<?= (int) $cp['points'] ?> pts each
                                         </div>
                                     </div>
                                 </div>
@@ -230,7 +230,7 @@ $defaultAddress = 'Unit 88 Penthouse, Maranan Tower, Bonifacio Global City, Tagu
                         <div class="pt-2 border-t border-zinc-800 flex justify-between items-center text-sm">
                             <div>
                                 <span class="text-zinc-400 block text-xs">Total Points Earned:</span>
-                                <strong class="text-emerald-400 font-mono">+<?= (int) $cartPoints ?> PV Points</strong>
+                                <strong class="text-emerald-400 font-mono">+<?= (int) $cartPoints ?> Points</strong>
                             </div>
                             <div class="text-right">
                                 <span class="text-zinc-400 block text-xs">Total Amount:</span>
@@ -265,7 +265,7 @@ $defaultAddress = 'Unit 88 Penthouse, Maranan Tower, Bonifacio Global City, Tagu
                             <th class="py-3 px-4">Order #</th>
                             <th class="py-3 px-4">Date</th>
                             <th class="py-3 px-4">Items Ordered</th>
-                            <th class="py-3 px-4">PV Points</th>
+                            <th class="py-3 px-4">Points</th>
                             <th class="py-3 px-4">Payment Method</th>
                             <th class="py-3 px-4 text-right">Total</th>
                             <th class="py-3 px-4 text-right">Status</th>
@@ -277,7 +277,7 @@ $defaultAddress = 'Unit 88 Penthouse, Maranan Tower, Bonifacio Global City, Tagu
                                 <td class="py-3.5 px-4 font-mono font-bold text-white"><?= e($o['orderNumber']) ?></td>
                                 <td class="py-3.5 px-4 text-zinc-400 text-[11px]"><?= e($o['date']) ?></td>
                                 <td class="py-3.5 px-4 text-zinc-200"><?= e(implode(', ', array_map(fn ($i) => $i['name'] . ' (x' . $i['quantity'] . ')', $o['items']))) ?></td>
-                                <td class="py-3.5 px-4 font-mono text-emerald-400 font-bold">+<?= (int) $o['totalPoints'] ?> PV</td>
+                                <td class="py-3.5 px-4 font-mono text-emerald-400 font-bold">+<?= (int) $o['totalPoints'] ?> pts</td>
                                 <td class="py-3.5 px-4 text-zinc-400"><?= e($o['paymentMethod']) ?></td>
                                 <td class="py-3.5 px-4 font-mono font-bold text-white text-right"><?= peso($o['totalAmount']) ?> PHP</td>
                                 <td class="py-3.5 px-4 text-right">

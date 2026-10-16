@@ -13,11 +13,25 @@ if ($invoiceRef !== '') {
 }
 $item = isset($_GET['checkout']) && is_string($_GET['checkout']) && checkout_item($_GET['checkout']) ? $_GET['checkout'] : 'membership_executive';
 
+// A membership bought by someone who isn't signed in is a sign-up: send them to the sign-up form, where they
+// pay with Maya Checkout or an activation code and its PIN, and the account is created. (Signed-in members
+// renewing or upgrading, invoices and returns from Maya stay here.)
+if (!$user && $invoiceRef === '' && !isset($_GET['maya']) && in_array($item, ['membership_executive', 'membership_chairmans'], true)) {
+    header('Location: ' . url('main', ['package' => $item]) . '#register');
+    return;
+}
+
 // Back from Maya: the status always comes from Maya itself (maya_sync), never from ?result=.
 $mayaRrn = isset($_GET['maya']) && is_string($_GET['maya']) ? $_GET['maya'] : null;
-// A Member Shop order's payment is shown in the backoffice shop.
-if ($mayaRrn !== null && db_value('SELECT 1 FROM maya_checkouts WHERE rrn = ? AND order_id IS NOT NULL', [$mayaRrn])) {
-    header('Location: ' . url('backoffice', ['tab' => 'shop', 'shop' => 'orders', 'maya' => $mayaRrn, 'result' => isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : '']));
+// A Member Shop order's payment is shown in the backoffice shop; a card order's on the member's card.
+$mayaLink = $mayaRrn !== null ? db_one('SELECT order_id, card_order_id FROM maya_checkouts WHERE rrn = ?', [$mayaRrn]) : null;
+$mayaBackResult = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : '';
+if ($mayaLink && $mayaLink['order_id'] !== null) {
+    header('Location: ' . url('backoffice', ['tab' => 'shop', 'shop' => 'orders', 'maya' => $mayaRrn, 'result' => $mayaBackResult]));
+    return;
+}
+if ($mayaLink && $mayaLink['card_order_id'] !== null) {
+    header('Location: ' . card_order_back_url($mayaLink['card_order_id'], $mayaRrn, $mayaBackResult));
     return;
 }
 $mayaRow =$mayaRrn !== null && preg_match('/^MAYA-[0-9A-F]{24}$/', $mayaRrn) ? maya_sync($mayaRrn) : null;

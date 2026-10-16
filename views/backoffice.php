@@ -2,7 +2,7 @@
 /**
  * Member Backoffice & CMS (reference component "Mn").
  *
- * Loads every dataset once and renders the nine tabs; tab switching is
+ * Loads every dataset once and renders the eleven tabs; tab switching is
  * client-side ([data-tab-group="bo"], URL param "tab"). Tab 8, Contacts
  * (views/backoffice/contacts.php), and tab 9, My Website
  * (views/backoffice/website.php), load their own data.
@@ -19,7 +19,7 @@
  */
 if (!$user) {
     $gateTitle = 'Sign in to access the Member Backoffice';
-    $gateText = 'Your binary compensation network, genealogy tree, commission wallet and 1EVOAI smart card hub are available after executive sign-in.';
+    $gateText = 'Your team, team tree, rewards wallet and 1EVOAI smart card hub are available after executive sign-in.';
     require __DIR__ . '/partials/gate.php';
     return;
 }
@@ -31,7 +31,7 @@ if (is_admin($user) && is_string($_GET['member'] ?? null) && $_GET['member'] !==
     $boAccounts = $boViewing ? mlm_member_accounts($boViewing['id']) : [];
     if (!$boViewing || !$boAccounts) {
         $gateTitle = $boViewing ? $boViewing['name'] . ' has no backoffice account yet' : 'This user doesn\'t exist';
-        $gateText = $boViewing ? 'A backoffice account (head) is created when the member signs up or first opens the Member Backoffice.' : 'The account may have been deleted. Go back to Management Admin → Users.';
+        $gateText = $boViewing ? 'A backoffice account is created when the member signs up or first opens the Member Backoffice.' : 'The account may have been deleted. Go back to Management Admin → Users.';
         require __DIR__ . '/partials/gate.php';
         return;
     }
@@ -51,6 +51,13 @@ if ($boViewing) {
     $boHeadUrl = fn (string $head): string => url('backoffice', ['member' => $boViewing['id'], 'head' => $head]);
 } else {
     $accounts = mlm_accounts_for_user($user);
+    if (!$accounts) {
+        // An admin user without a backoffice account of their own (members get one automatically).
+        $gateTitle = 'No backoffice account';
+        $gateText = 'Your admin user has no Member Backoffice account of its own. To look at a member\'s backoffice, open Management Admin → Users and click Backoffice.';
+        require __DIR__ . '/partials/gate.php';
+        return;
+    }
     $account = mlm_active_account($user);
 }
 $complan = mlm_complan();
@@ -74,13 +81,15 @@ $cms = get_cms();
 $boTabs = [
     ['id' => 'dashboard', 'label' => '1. Dashboard', 'icon' => 'layout-dashboard'],
     ['id' => 'my_account', 'label' => '2. My Account', 'icon' => 'user-check'],
-    ['id' => 'network', 'label' => '3. Network', 'icon' => 'git-fork', 'badge' => (string) ($account['leftCount'] + $account['rightCount'])],
+    ['id' => 'network', 'label' => '3. My Team', 'icon' => 'git-fork', 'badge' => (string) ($account['leftCount'] + $account['rightCount'])],
     ['id' => 'transactions', 'label' => '4. Transactions', 'icon' => 'arrow-up-down'],
     ['id' => 'reports', 'label' => '5. Reports', 'icon' => 'chart-column'],
     ['id' => 'shop', 'label' => '6. Shop', 'icon' => 'shopping-bag'],
     ['id' => 'digital_card', 'label' => '7. Digital Card CMS', 'icon' => 'credit-card', 'badge' => 'NFC'],
     ['id' => 'contacts', 'label' => '8. Contacts', 'icon' => 'users', 'badge' => number_format((int) db_value('SELECT COUNT(*) FROM crm_contacts WHERE user_id = ?', [$user['id']]))],
     ['id' => 'website', 'label' => '9. My Website', 'icon' => 'monitor', 'badge' => !site_unlocked($user['id']) ? 'Locked' : (site_is_live($user['id']) ? 'Live' : 'Draft')],
+    ['id' => 'products', 'label' => '10. My Products', 'icon' => 'tag', 'badge' => ($cardNewOrders = (int) db_value('SELECT COUNT(*) FROM card_orders WHERE seller_id = ? AND status = "paid" AND fulfillment = "new"', [$user['id']])) > 0 ? $cardNewOrders . ' new' : null],
+    ['id' => 'academy', 'label' => '11. Mentor Academy', 'icon' => 'graduation-cap', 'badge' => ($academyNew = academy_new_count($user['id'])) > 0 ? $academyNew . ' new' : null],
 ];
 $boTab = (string) ($_GET['tab'] ?? 'dashboard');
 if (!in_array($boTab, array_column($boTabs, 'id'), true)) {
@@ -104,7 +113,7 @@ $pageData['backoffice'] = [
 if ($boViewing) {
     $pageScripts[] = 'assets/js/views/bo-readonly.js'; // first: guards every later script
 }
-foreach (['dashboard', 'my-account', 'network', 'transactions', 'reports', 'shop', 'digital-card', 'domains', 'contacts', 'website'] as $js) {
+foreach (['dashboard', 'my-account', 'network', 'transactions', 'reports', 'shop', 'digital-card', 'card-design', 'domains', 'contacts', 'website', 'products', 'academy'] as $js) {
     if (is_file(APP_ROOT . '/assets/js/views/bo-' . $js . '.js')) {
         $pageScripts[] = 'assets/js/views/bo-' . $js . '.js';
     }
@@ -120,44 +129,39 @@ $pageScripts[] = 'assets/js/checkout.js';
                 <span>You're viewing <strong class="text-white"><?= e($boViewing['name']) ?></strong>'s Member Backoffice (<?= e($boViewing['email']) ?>) as Management Admin. This view is read-only: nothing can be changed here.</span>
             </p>
             <div class="flex items-center gap-2 shrink-0">
-                <a href="<?= e(url('admin', ['tab' => 'users'])) ?>" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 font-semibold transition-colors flex items-center gap-1"><?= icon('user-check', 'w-3.5 h-3.5') ?><span>Back to Users</span></a>
+                <a href="<?= e(url('admin', ['tab' => 'users', 'show' => '1', 'q' => $boViewing['email']])) ?>" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 font-semibold transition-colors flex items-center gap-1"><?= icon('user-check', 'w-3.5 h-3.5') ?><span>Back to Users</span></a>
                 <a href="<?= e(url('backoffice')) ?>" class="px-3 py-1.5 rounded-xl bg-[#f3bd35] hover:bg-[#ffda72] text-black font-bold transition-colors">My Backoffice</a>
             </div>
         </div>
     <?php endif; ?>
     <div class="p-5 rounded-3xl bg-gradient-to-r from-[#18130a] via-[#120f09] to-[#0c0c0c] border border-[#f3bd35]/40 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-            <div class="flex items-center gap-2 flex-wrap mb-1.5">
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#f3bd35]/20 border border-[#f3bd35]/40 text-[#f3bd35] text-[10px] font-extrabold tracking-widest uppercase">
-                    <?= icon('zap', 'w-3.5 h-3.5') ?>Binary Complan (₱<?= e(rtrim(rtrim(number_format($complan['entryFee'] / 1000, 1), '0'), '.')) ?>k Entry · ₱<?= num($complan['directReferralBonus']) ?> Direct · ₱<?= num($complan['pairingBonus']) ?> Pair)
-                </span>
-                <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold"><?= $complan['maxPairsPerCycle'] ?> Pairs/Cycle · <?= $complan['cyclesPerDay'] ?> Cycle<?= $complan['cyclesPerDay'] === 1 ? '' : 's' ?>/Day</span>
-            </div>
             <h2 class="text-xl sm:text-2xl font-black text-white flex items-center gap-2">88MMM Member Backoffice &amp; CMS<?= icon('shield-check', 'w-5 h-5 text-[#f3bd35]') ?></h2>
-            <p class="text-xs text-zinc-400 mt-0.5">Binary compensation network, geneology tree, commission encashments, and 1EVOAI smart card hub.</p>
+            <p class="text-xs text-zinc-400 mt-0.5">Your team, team tree, reward withdrawals, and 1EVOAI smart card hub.</p>
         </div>
         <div class="flex items-center gap-3">
             <div class="relative" data-dropdown>
                 <button type="button" data-dropdown-toggle aria-expanded="false" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-[#f3bd35]/40 hover:border-[#f3bd35] text-xs text-white transition-all shadow">
                     <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
                     <div class="text-left">
-                        <span class="text-[10px] text-zinc-400 block -mb-0.5">Active Head</span>
+                        <span class="text-[10px] text-zinc-400 block -mb-0.5">Active Account</span>
                         <span class="font-bold text-[#ffda72] font-mono"><?= e($account['id']) ?></span>
                     </div>
                     <?= icon('chevron-down', 'w-3.5 h-3.5 text-zinc-400 ml-1') ?>
                 </button>
-                <div data-dropdown-menu hidden class="absolute right-0 mt-2 w-64 bg-[#141414] border border-[#f3bd35]/40 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in">
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 px-2.5 py-1 border-b border-zinc-800 mb-1">Switch Active Account / Head</div>
+                <div data-dropdown-menu hidden class="evo-acc-menu absolute mt-2 w-64 bg-[#141414] border border-[#f3bd35]/40 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 px-2.5 py-1 border-b border-zinc-800 mb-1">Switch Active Account</div>
+                    <div class="evo-switch-list">
                     <?php foreach ($accounts as $a): ?>
                         <?php if ($boViewing): ?>
-                            <a href="<?= e($boHeadUrl($a['id'])) ?>" class="w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors <?= $a['id'] === $account['id'] ? 'bg-[#f3bd35] text-black font-bold' : 'text-zinc-200 hover:bg-zinc-800' ?>">
+                            <a href="<?= e($boHeadUrl($a['id'])) ?>"<?= $a['id'] === $account['id'] ? ' aria-current="true"' : '' ?> class="w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors <?= $a['id'] === $account['id'] ? 'bg-[#f3bd35] text-black font-bold' : 'text-zinc-200 hover:bg-zinc-800' ?>">
                                 <div>
                                     <div class="font-bold"><?= e($a['accountName']) ?></div>
                                     <div class="text-[10px] opacity-75 font-mono"><?= e($a['id']) ?> · Bal: <?= peso($a['availableBalance']) ?></div>
                                 </div>
                             </a>
                         <?php else: ?>
-                        <button type="button" data-set-account="<?= e($a['id']) ?>" class="w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors <?= $a['id'] === $account['id'] ? 'bg-[#f3bd35] text-black font-bold' : 'text-zinc-200 hover:bg-zinc-800' ?>">
+                        <button type="button" data-set-account="<?= e($a['id']) ?>"<?= $a['id'] === $account['id'] ? ' aria-current="true"' : '' ?> class="w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors <?= $a['id'] === $account['id'] ? 'bg-[#f3bd35] text-black font-bold' : 'text-zinc-200 hover:bg-zinc-800' ?>">
                             <div>
                                 <div class="font-bold"><?= e($a['accountName']) ?></div>
                                 <div class="text-[10px] opacity-75 font-mono"><?= e($a['id']) ?> · Bal: <?= peso($a['availableBalance']) ?></div>
@@ -165,6 +169,7 @@ $pageScripts[] = 'assets/js/checkout.js';
                         </button>
                         <?php endif; ?>
                     <?php endforeach; ?>
+                    </div>
                 </div>
             </div>
             <div class="p-2 px-3 rounded-xl bg-zinc-950 border border-zinc-800 text-right hidden sm:block">

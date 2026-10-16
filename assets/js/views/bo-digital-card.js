@@ -63,6 +63,87 @@
     }
   }
 
+  /* ------------------------------------------------------------------
+   * Profile picture: upload or remove it (saved at once, profile.avatar*).
+   * ---------------------------------------------------------------- */
+  var photoBox = root.querySelector('[data-dc-photo-box]');
+  var photoReadOnly = !!((window.EVO_PAGE || {}).backoffice || {}).readOnly;
+  function showPhoto(path) {
+    var img = photoBox.querySelector('[data-dc-photo]');
+    if (path) img.setAttribute('src', mediaUrl(path));
+    img.hidden = !path;
+    photoBox.querySelector('[data-dc-photo-initial]').hidden = !!path;
+    photoBox.querySelector('[data-dc-photo-remove]').hidden = !path;
+    form.elements.avatar.value = path || '';
+    renderAvatar();
+  }
+  if (photoBox && photoReadOnly) {
+    // An admin viewing the member's backoffice: nothing can be changed here.
+    photoBox.querySelectorAll('[data-dc-photo-pick], [data-dc-photo-remove]').forEach(function (b) {
+      b.disabled = true;
+      b.title = 'Read-only: this is the member’s backoffice.';
+    });
+  }
+  if (photoBox && !photoReadOnly) {
+    var photoFile = photoBox.querySelector('[data-dc-photo-file]');
+    var pickBtn = photoBox.querySelector('[data-dc-photo-pick]');
+    pickBtn.addEventListener('click', function () {
+      photoFile.click();
+    });
+    photoFile.addEventListener('change', function () {
+      var file = photoFile.files && photoFile.files[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) {
+        EVO.toast('That picture is too big (5 MB at most).', 'error');
+        photoFile.value = '';
+        return;
+      }
+      var fd = new FormData();
+      fd.append('image', file);
+      var restore = EVO.busy(pickBtn, 'Uploading…');
+      fetch(EVO.base + '/api.php?action=profile.avatarUpload', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': EVO.csrf, Accept: 'application/json' }, body: fd })
+        .then(function (r) {
+          return r.json().catch(function () {
+            return { ok: false, error: 'The server did not answer. Please try again.' };
+          });
+        })
+        .then(function (res) {
+          restore();
+          photoFile.value = '';
+          if (!res.ok) throw new Error(res.error || 'The picture could not be uploaded.');
+          showPhoto(res.avatar);
+          EVO.toast(res.message);
+        })
+        .catch(function (e) {
+          restore();
+          EVO.toast(e.message, 'error');
+        });
+    });
+    photoBox.querySelector('[data-dc-photo-remove]').addEventListener('click', function () {
+      var btn = this;
+      if (!window.confirm('Remove your profile picture? Your card will show your initials instead.')) return;
+      var restore = EVO.busy(btn, 'Removing…');
+      EVO.api('profile.avatarRemove', {})
+        .then(function (res) {
+          restore();
+          showPhoto('');
+          EVO.toast(res.message);
+        })
+        .catch(function (e) {
+          restore();
+          EVO.toast(e.message, 'error');
+        });
+    });
+    // A web address typed in instead also updates the small preview.
+    form.elements.avatar.addEventListener('change', function () {
+      var v = form.elements.avatar.value.trim();
+      var img = photoBox.querySelector('[data-dc-photo]');
+      if (v) img.setAttribute('src', mediaUrl(v));
+      img.hidden = !v;
+      photoBox.querySelector('[data-dc-photo-initial]').hidden = !!v;
+    });
+  }
+
   function renderServices() {
     var box = pv('services');
     box.innerHTML = services
@@ -245,10 +326,10 @@
    * ---------------------------------------------------------------- */
   var qrDrawn = false;
   function drawQr() {
-    if (qrDrawn || typeof window.qrcode !== 'function' || !data.shareUrl) return;
+    if (qrDrawn || typeof window.qrcode !== 'function' || !(data.qrUrl || data.shareUrl)) return;
     try {
       var qr = window.qrcode(0, 'H');
-      qr.addData(data.shareUrl);
+      qr.addData(data.qrUrl || data.shareUrl); // the 1EVOAI card address, not the member's own domain
       qr.make();
       var n = qr.getModuleCount();
       var size = 170;
